@@ -14,8 +14,6 @@ from numpy.testing import assert_array_almost_equal, assert_almost_equal
 from analogue_algorithm.calc import rmse, find_analogue_rmse, verify_members
 from datetime import datetime
 import xarray as xr
-import pandas as pd
-import pytest
 
 
 def test_rmse_no_diff():

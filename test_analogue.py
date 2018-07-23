@@ -37,9 +37,8 @@ domain = sys.argv[1]
 thresh = sys.argv[2]
 stdev = sys.argv[3]
 save_dir = sys.argv[4]
+
 method = 'rmse'
-verif_std = 2
-verif_thresh = 0.5
 
 # save_dir = '/home/twixtrom/analogue_analysis/'+method+'/'+thresh+'/' + \
 #            'std'+str(stdev)+'/'
@@ -64,6 +63,13 @@ threshold = float(thresh)
 data_start_date = datetime(2015, 1, 1, 12)
 an_start_date = datetime(2015, 10, 1, 12)
 an_end_date = datetime(2015, 12, 29, 12)
+verif_param = {
+    'forecast_hour': fhour,
+    'threshold': 0.5,
+    'sigma': 2,
+    'start_date': data_start_date,
+    'end_date': an_start_date
+}
 
 mem_list = ['mem'+str(i) for i in range(1, 21)]
 mp_list = ['mem'+str(i) for i in range(1, 11)]
@@ -243,8 +249,7 @@ plt.savefig(save_dir+method+'_'+thresh+'_std'+str(stdev)+'_'+str(fhour)+'_d0' +
 
 # Find average best member
 print('Finding Best Member')
-tot_rmse = verify_members(pcp, stage4.total_precipitation, fhour, verif_thresh,
-                          verif_std, data_start_date, an_start_date)
+tot_rmse = verify_members(pcp, stage4.total_precipitation, verif_param)
 
 mean_best_mp = mp_list[np.array([tot_rmse[mem]] for mem in mp_list).argmin()]
 mean_best_pbl = pbl_list[np.array([tot_rmse[mem]] for mem in pbl_list).argmin()]
