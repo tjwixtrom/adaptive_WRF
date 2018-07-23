@@ -11,7 +11,7 @@
 ##############################################################################################
 import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
-from calc.calc import rmse, find_analogue_rmse
+from analogue_algorithm.calc import rmse, find_analogue_rmse
 from datetime import datetime
 import xarray as xr
 import pandas as pd
@@ -44,16 +44,17 @@ def test_rmse_axis():
 def test_find_analogue_rmse():
     """tests the find_analogue_rmse function"""
     date = datetime(2016, 1, 1, 12)
+    date_array = np.array([datetime(2015, 12, 28, 12), datetime(2015, 12, 29, 12),
+                           datetime(2015, 12, 30, 12), datetime(2015, 12, 31, 12),
+                           datetime(2016, 1, 1, 12)])
     data = np.ones((5, 10, 10)) * np.linspace(0, 50, 500).reshape(5, 10, 10)
     lat = np.linspace(40, 45, 10)
     lon = np.linspace(-105, -100, 10)
     mlon, mlat = np.meshgrid(lon, lat)
     dataset = xr.Dataset({'mean': (['time', 'latitude', 'longitude'], data)},
-                                   coords={'time': pd.date_range(start='2015-12-28T12:00:00',
-                                                                 end='2016-1-1T12:00:00',
-                                                                 periods=5),
-                                           'reference_time': pd.Timestamp('2015-01-01'),
-                                           'latitude': (['latitude', 'longitude'], mlat),
-                                           'longitude': (['latitude', 'longitude'], mlon)})
+                         coords={'time': date_array,
+                                 'reference_time': pd.Timestamp('2015-01-01'),
+                                 'lat': (['latitude', 'longitude'], mlat),
+                                 'lon': (['latitude', 'longitude'], mlon)})
     an_idx, fcst_smooth = find_analogue_rmse(date, dataset, 10, 5)
-    assert_almost_equal(an_idx, 1, 4)
+    assert_almost_equal(an_idx, 3, 4)
