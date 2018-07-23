@@ -1,11 +1,11 @@
-#!/home/twixtrom/miniconda3/envs/research/bin/python
+#!/home/twixtrom/miniconda3/envs/analogue/bin/python
 ##############################################################################################
 # test_analogue.py - Code for testing analogue methods
 #
 # Code to calculate analogues for each test forecast
 # and save the ranking to a numpy file as a list
 # Also outputs various plots to analyze the analogue performance
-# Tests code found in calc_analogue.py
+# Tests code found in calc.py
 #
 # Analogues are calculated based on a subset of the total dataset
 # Performance is then determined by ranking the analogue selected
@@ -19,7 +19,6 @@
 ##############################################################################################
 
 from datetime import datetime, timedelta
-from dask.diagnostics import ProgressBar
 from netCDF4 import num2date
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,20 +28,21 @@ from scipy.ndimage import gaussian_filter
 import warnings
 import xarray as xr
 
-from analogue_algorithm.calc_analogue import rmse
-
+from analogue_algorithm.calc import rmse, find_analogue_rmse, verify_members
+from analogue_algorithm.plots import plot_panels
 warnings.filterwarnings("ignore")
 plt.switch_backend('agg')
 
 domain = sys.argv[1]
 thresh = sys.argv[2]
 stdev = sys.argv[3]
+save_dir = sys.argv[4]
 method = 'rmse'
 verif_std = 2
 verif_thresh = 0.5
 
-save_dir = '/lustre/work/twixtrom/analogue_analysis/'+method+'/'+thresh+'/' + \
-           'std'+str(stdev)+'/'
+# save_dir = '/home/twixtrom/analogue_analysis/'+method+'/'+thresh+'/' + \
+#            'std'+str(stdev)+'/'
 fhour = 48
 
 if domain == '1':
@@ -70,7 +70,7 @@ mp_list = ['mem'+str(i) for i in range(1, 11)]
 pbl_list = ['mem'+str(i) for i in range(11, 21)]
 
 print('Opening Dataset')
-pcp = xr.open_dataset(datafile, chunks={'time': 10}, decode_cf=False)
+pcp = xr.open_dataset(datafile, chunks={'time': 1}, decode_cf=False)
 vtimes_pcp = num2date(pcp.time, pcp.time.units)
 pcp.coords['time'] = np.array([np.datetime64(date) for date in vtimes_pcp])
 pcp['time'] = np.array([np.datetime64(date) for date in vtimes_pcp])
@@ -78,7 +78,7 @@ pcp.coords['lat'] = pcp.lat
 pcp.coords['lon'] = pcp.lon
 
 
-stage4 = xr.open_dataset(obsfile, chunks={'time': 10}, decode_cf=False)
+stage4 = xr.open_dataset(obsfile, chunks={'time': 1}, decode_cf=False)
 vtimes_stage4 = num2date(stage4.valid_times, stage4.valid_times.units)
 stage4.coords['time'] = np.array([np.datetime64(date) for date in vtimes_stage4])
 stage4['time'] = np.array([np.datetime64(date) for date in vtimes_stage4])
@@ -95,28 +95,10 @@ an_best_pbl = []
 date = an_start_date
 while date <= an_end_date:
     print('Starting date '+str(date))
-
-    # find index for current data, use all data up to that point
-    # idx = np.where(vtimes_pcp < date)[0]
-    fcst_mean = pcp['mean'].sel(time=date, drop=True)
-
-    # Smooth and mask forecast mean
-    fcst_smooth = gaussian_filter(fcst_mean, float(stdev))
-    fcst_masked = fcst_mean.where(fcst_smooth >= threshold)
-
-    # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-    dataset_mean = pcp['mean'].where(pcp.time < date, drop=True)
-    dataset_mean_masked = dataset_mean.where(fcst_smooth >= threshold)
-
-    # Actually find the index of the closest analogue
-    print('Finding closest analogue')
-    try:
-        with ProgressBar():
-            an_idx = np.nanargmin(rmse(dataset_mean_masked, fcst_masked, axis=(1, 2)))
-    except ValueError:
+    an_idx, fcst_smooth = find_analogue_rmse(date, pcp, threshold, float(stdev))
+    if np.isnan(an_idx):
         an_best_mp.append(('nan', np.nan, date, np.nan))
         an_best_pbl.append(('nan', np.nan, date, np.nan))
-        print('No analogue found')
     else:
         print('Analogue date selected '+str(vtimes_pcp[an_idx]))
         # Get the analogue's verification
@@ -211,97 +193,16 @@ np.save(outname_mp, an_best_mp)
 np.save(outname_pbl, an_best_pbl)
 
 print('Analyzing Output')
-# num_top_mp = 0
-# mp_best = 0
-# mp_worst = 0
 mp_ranks = []
 for case in an_best_mp:
-    #     if case[1] <= 4:
-    #         num_top_mp += 1
-    #     if case[1] == 0:
-    #         mp_best += 1
-    #     if case[1] == 9:
-    #         mp_worst += 1
     mp_ranks.append(case[1])
-#
-# num_top_pbl = 0
-# pbl_best = 0
-# pbl_worst = 0
+
 pbl_ranks = []
 for case in an_best_pbl:
-    #     if case[1] <= 4:
-    #         num_top_pbl += 1
-    #     if case[1] == 0:
-    #         pbl_best += 1
-    #     if case[1] == 9:
-    #         pbl_worst += 1
     pbl_ranks.append(case[1])
-#
-# print('Microphysics Members:')
-# print(str(len(an_best_mp)), ' total cases')
-# print('Analogue member in top half of observed ranking ', str(num_top_mp), 'cases')
-# print('Analogue selected best member for ', str(mp_best), 'cases')
-# print('Analogue selected worst member for ', str(mp_worst), 'cases')
-#
-# print('PBL Members:')
-# print(str(len(an_best_pbl)), ' total cases')
-# print('Analogue member in top half of observed ranking ', str(num_top_pbl), 'cases')
-# print('Analogue selected best member for ', str(pbl_best), 'cases')
-# print('Analogue selected worst member for ', str(pbl_worst), 'cases')
 
 an_pbl = [case[0] for case in an_best_pbl]
 an_mp = [case[0] for case in an_best_mp]
-
-
-def plot_panels(figsize, layout, num_axes, grid=True, axis_titles=None, x_labels=None,
-                y_labels=None, ylim=None, xlim=None, proj=None):
-    """Generate matplotlib axis object for a given figsize and layout
-    figsize: tuple
-        tuple of the figure size.
-    layout: tuple
-        layout that should be passed to figure.add_subplot.
-    num_axes: int
-        number of axes.
-    grid: bool
-        add a grid background if true (default).
-    axis_titles: list
-        list of string titles for each axis.
-    x_labels, y_labels: list
-        list of x and y labels for each axis.
-        If only one is given all axes will be labeled the same.
-    x_lim, ylim: tuple
-        tuple of x-axis or y-axis limits.
-
-    Returns:
-        list of axis objects corresponding to each axis in the input layout.
-
-    """
-    fig = plt.figure(figsize=figsize)
-    ret = []
-    for i in range(num_axes):
-        ax = fig.add_subplot(layout[0], layout[1], i+1, projection=proj)
-        if grid:
-            ax.grid()
-        if axis_titles is not None:
-            ax.set_title(axis_titles[i])
-        if x_labels is not None:
-            if len(x_labels) > 1:
-                ax.set_xlabel(x_labels[i])
-            else:
-                ax.set_xlabel(x_labels[0])
-        if y_labels is not None:
-            if len(y_labels) > 1:
-                ax.set_ylabel(y_labels[i])
-            else:
-                ax.set_ylabel(y_labels[0])
-        if ylim is not None:
-            ax.set_ylim(ylim[0], ylim[1])
-        if xlim is not None:
-            ax.set_xlim(xlim[0], xlim[1])
-
-        ret.append(ax)
-    return ret
-
 
 print('Generating Histograms')
 xlab = 'Member'
@@ -341,27 +242,9 @@ plt.savefig(save_dir+method+'_'+thresh+'_std'+str(stdev)+'_'+str(fhour)+'_d0' +
             str(domain)+'_ranks.png')
 
 # Find average best member
-tot_rmse = {}
-
 print('Finding Best Member')
-# For MP Members
-# fcst_times = (pcp.time.where(pcp.time < np.datetime64(an_start_date), drop=True).values +
-#               np.timedelta64(fhour, 'h'))
-# st4_data = stage4.total_precipitation.sel(time=fcst_times)
-for mem in mem_list:
-    tot_rmse[mem] = []
-
-date = data_start_date
-while date < an_start_date:
-    print('Starting date '+str(date))
-    st4_date = date + timedelta(hours=fhour)
-    st4_data = stage4.total_precipitation.sel(time=st4_date)
-    st4_smooth = gaussian_filter(st4_data, verif_std)
-    for mem in mem_list:
-        mem_rmse = tot_rmse[mem]
-        mem_data = pcp[mem].sel(time=date).where(st4_smooth >= verif_thresh)
-        tot_rmse[mem] = mem_rmse + rmse(mem_data.values,
-                                        st4_data.where(st4_smooth >= verif_thresh).values)
+tot_rmse = verify_members(pcp, stage4.total_precipitation, fhour, verif_thresh,
+                          verif_std, data_start_date, an_start_date)
 
 mean_best_mp = mp_list[np.array([tot_rmse[mem]] for mem in mp_list).argmin()]
 mean_best_pbl = pbl_list[np.array([tot_rmse[mem]] for mem in pbl_list).argmin()]

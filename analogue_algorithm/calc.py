@@ -9,6 +9,7 @@
 #
 ##############################################################################################
 from dask.diagnostics import ProgressBar
+from datetime import timedelta
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
@@ -63,3 +64,39 @@ def find_analogue_rmse(forecast_date, dataset, threshold, sigma):
     except ValueError:
         an_idx = np.nan
     return an_idx, fcst_smooth
+
+
+def verify_members(dataset, observations, forecast_hour, threshold, sigma,
+                   start_date, end_date):
+    """
+    Calculates the sum of RMSE for each dataset member over the specified time range
+
+    :param dataset: input forecast xarray dataset
+    :param observations: observations xarray dataset
+    :param forecast_hour: valid forecast hour of forecast dataset
+    :param threshold: threshold for verification masking
+    :param sigma: standard deviation of guassian filter
+    :param start_date: start date of verification period
+    :param end_date: end date of verification period
+    :return: Sum of RMSE for each member over verification period
+    """
+    tot_rmse = {}
+    mem_list = dataset.data_vars.keys()
+    print(mem_list)
+    if 'mean' in mem_list:
+        mem_list.remove('mean')
+    for mem in mem_list:
+        tot_rmse[mem] = []
+
+    date = start_date
+    while date < end_date:
+        obs_date = date + timedelta(hours=forecast_hour)
+        obs_data = observations.sel(time=obs_date)
+        obs_smooth = gaussian_filter(obs_data, sigma)
+        for mem in mem_list:
+            mem_rmse = tot_rmse[mem]
+            mem_data = dataset[mem].sel(time=date).where(obs_smooth >= threshold)
+            tot_rmse[mem] = mem_rmse + rmse(mem_data.values,
+                                            obs_data.where(obs_smooth >= threshold).values)
+        date += timedelta(days=1)
+    return tot_rmse

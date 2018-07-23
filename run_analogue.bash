@@ -4,9 +4,9 @@
 #$ -S /bin/bash
 #$ -N analogue
 #$ -q ancellcc
-#$ -pe sm 8
+#$ -pe sm 32
 #$ -P communitycluster
-#$ -t 1-40:1
+#$ -t 1-2:1
 
 # Array job script for testing multiple thresholds/methods on both the inner and outer
 # dataset domains.
@@ -27,7 +27,8 @@ thresh=${thresholds[${thresh_idx}]}
 stdev=${stdevs[${stdevs_idx}]}
 
 method="rmse"
-mkdir -p /lustre/work/twixtrom/analogue_analysis/${method}/${thresh}/std${stdev}
-python_exec=/home/twixtrom/miniconda3/envs/research/bin/python
-runscript=/home/twixtrom/adaptive_ensemble/analogue_algorithm/test_analogue.py
-${python_exec} ${runscript} ${domain} ${thresh} ${stdev}
+save_dir=/home/twixtrom/analogue_analysis/${method}/${thresh}/std${stdev}
+mkdir -p ${save_dir}
+python_exec=/home/twixtrom/miniconda3/envs/analogue/bin/python
+runscript=/home/twixtrom/analogue_algorithm/test_analogue.py
+${python_exec} ${runscript} ${domain} ${thresh} ${stdev} ${save_dir}
