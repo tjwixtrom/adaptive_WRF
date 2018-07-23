@@ -81,7 +81,7 @@ def verify_members(dataset, observations, parameters):
     :return: Sum of RMSE for each member over verification period
     """
     tot_rmse = {}
-    mem_list = dataset.data_vars.keys()
+    mem_list = [mem for mem in dataset.data_vars.keys()]
     print(mem_list)
     if 'mean' in mem_list:
         mem_list.remove('mean')
@@ -89,7 +89,7 @@ def verify_members(dataset, observations, parameters):
         tot_rmse[mem] = []
 
     date = parameters['start_date']
-    while date < parameters['end_date']:
+    while date <= parameters['end_date']:
         obs_date = date + timedelta(hours=parameters['forecast_hour'])
         obs_data = observations.sel(time=obs_date)
         obs_smooth = gaussian_filter(obs_data, parameters['sigma'])

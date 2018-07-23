@@ -59,15 +59,21 @@ def test_find_analogue_rmse():
 
 
 def test_verif_members():
-    date1 = datetime(2015, 12, 28, 12)
-    date2 = datetime(2015, 12, 30, 12)
+    param = {
+        'forecast_hour': 0,
+        'threshold': 10,
+        'sigma': 2,
+        'start_date': datetime(2015, 12, 28, 12),
+        'end_date': datetime(2015, 12, 29, 12)
+    }
     date_array = np.array([datetime(2015, 12, 28, 12), datetime(2015, 12, 29, 12)])
     data = np.ones((2, 5, 5)) * np.linspace(5, 30, 50).reshape(2, 5, 5)
     lat = np.linspace(40, 45, 5)
     lon = np.linspace(-105, -100, 5)
     mlon, mlat = np.meshgrid(lon, lat)
     dataset = xr.Dataset({'mem1': (['time', 'latitude', 'longitude'], data),
-                          'mem2': (['time', 'latitude', 'longitude'], data * 2.)},
+                          'mem2': (['time', 'latitude', 'longitude'], data * 2.),
+                          'mean': (['time', 'latitude', 'longitude'], data * 0.5)},
                          coords={'time': date_array,
                                  'lat': (['latitude', 'longitude'], mlat),
                                  'lon': (['latitude', 'longitude'], mlon)})
@@ -75,6 +81,6 @@ def test_verif_members():
                      coords={'time': date_array,
                              'lat': (['latitude', 'longitude'], mlat),
                              'lon': (['latitude', 'longitude'], mlon)})
-    tot_rmse = verify_members(dataset, obs.total_precipitation, 0, 10, 2, date1, date2)
+    tot_rmse = verify_members(dataset, obs.total_precipitation, param)
     best_mem = np.array([tot_rmse[mem]] for mem in dataset.data_vars.keys()).argmin()
     assert_almost_equal(best_mem, 0, 4)
