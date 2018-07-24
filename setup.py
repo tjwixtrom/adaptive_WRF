@@ -1,9 +1,9 @@
 from setuptools import setup
 
 setup(
-    name='adaptive_ensemble',
+    name='Analogue Algorithm',
     version='0.1',
-    packages=['numpy', 'scipy', 'netCDF4', 'matplotlib', 'xarray', 'dask'],
+    packages=['analogue_algorithm'],
     url='',
     license='BSD-3',
     author='Tyler Wixtrom',

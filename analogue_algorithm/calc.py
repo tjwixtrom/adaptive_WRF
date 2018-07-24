@@ -12,6 +12,8 @@
 
 import numpy as np
 import pandas as pd
+import xarray as xr
+
 from dask.diagnostics import ProgressBar
 from scipy.ndimage import gaussian_filter
 
@@ -37,40 +39,47 @@ def rmse(predictions, targets, axis=None, nan=False):
     return rmse_data
 
 
-def find_analogue(forecast_date, dataset):
+def find_analogue(forecast_date, *args):
     """
     Finds the index value of the closest analogue within the input dataset
 
     :param forecast_date: datetime object or numpy.datetime64 object for forecast date.
         Forecast date should be included within dataset.
-    :param parameters: dict. Dictionary with project parameters. Should include 'threshold'
-        and 'sigma' values.
     :param args: xarray datasets containing analgoue forecasts. Ensemble mean should be
         named 'mean' in each dataset. One dataset for each variable. Dataset dimensions
-        should include initialized time, forecast hour, latitude, and longitude.
+        should include initialized time, forecast hour, latitude, and longitude. Global
+        attributes for sigma and threshold should also be defined.
     :return: index of closest analogue
     """
-    sigma = dataset.sigma
-    threshold = dataset.threshold
+    score = np.zeros(args[0].time.where(args[0].time < np.datetime64(forecast_date),
+                                        drop=True).shape)
+    for arg in args:
+        if 'mean' not in arg.data_vars.keys():
+            fcst_mean = xr.concat([arg[mem] for mem in arg.data_vars.keys()],
+                                  dim='Member').mean(dim='Member')
+            arg['mean'] = fcst_mean
+        sigma = arg.sigma
+        threshold = arg.threshold
 
-    fcst_mean = dataset['mean'].sel(time=forecast_date, drop=True)
+        fcst_mean = arg['mean'].sel(time=forecast_date, drop=True)
 
-    # Smooth and mask forecast mean
-    fcst_smooth = gaussian_filter(fcst_mean, sigma)
-    fcst_masked = fcst_mean.where(fcst_smooth >= threshold)
+        # Smooth and mask forecast mean
+        fcst_smooth = gaussian_filter(fcst_mean, sigma)
+        fcst_masked = fcst_mean.where(fcst_smooth >= threshold)
 
-    # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-    dataset_mean = dataset['mean'].where(dataset.time < np.datetime64(forecast_date),
+        # mask the mean, subset for up to current date, find closest analogues by mean RMSE
+        dataset_mean = arg['mean'].where(arg.time < np.datetime64(forecast_date),
                                          drop=True)
-    dataset_mean_masked = dataset_mean.where(fcst_smooth >= threshold)
+        dataset_mean_masked = dataset_mean.where(fcst_smooth >= threshold)
 
-    # Actually find the index of the closest analogue
+        # Actually find the index of the closest analogue
+        score += rmse(dataset_mean_masked, fcst_masked, axis=(1, 2))
     try:
         with ProgressBar():
-            an_idx = np.nanargmin(rmse(dataset_mean_masked, fcst_masked, axis=(1, 2)))
+            an_idx = np.nanargmin(score)
     except ValueError:
         an_idx = np.nan
-    return an_idx, fcst_smooth
+    return an_idx
 
 
 def verify_members(dataset, observations, parameters):

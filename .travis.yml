@@ -1,16 +1,12 @@
 language: python
 python:
   - "3.6"
-  - "3.6-dev"  # 3.6 development branch
-  - "3.7-dev"  # 3.7 development branch
 notifications:
   email: false
 
 # Install packages
 install:
-  - pip install numpy 
-  - pip install pandas 
-  - pip install xarray
+  - pip install numpy scipy netCDF4 pandas xarray dask
   - python setup.py install
 # command to run tests
 script:

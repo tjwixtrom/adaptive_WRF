@@ -1,6 +1,6 @@
 #!/home/twixtrom/miniconda3/envs/analogue/bin/python
 ##############################################################################################
-# test_analogue.py - Code for testing analogue methods
+# calc_analogue.py - Code for testing analogue methods
 #
 # Code to calculate analogues for each test forecast
 # and save the ranking to a numpy file as a list
@@ -96,25 +96,26 @@ stage4['time'] = np.array([np.datetime64(date) for date in vtimes_stage4])
 stage4.coords['lat'] = stage4.lat
 stage4.coords['lon'] = stage4.lon
 
-
-fcst_mean = xr.concat([pcp[mem] for mem in mem_list], dim='Member').mean(dim='Member')
-pcp['mean'] = fcst_mean
-
-
 an_best_mp = []
 an_best_pbl = []
 dates = pd.date_range(start=param['an_start_date'],
                       end=param['an_end_date'],
                       freq=param['dt'])
+
+fcst_mean = xr.concat([pcp[mem] for mem in pcp.data_vars.keys()],
+                      dim='Member').mean(dim='Member')
+pcp['mean'] = fcst_mean
+
 for date in dates:
     print('Starting date '+str(date))
-    an_idx, fcst_smooth = find_analogue(date, pcp)
+    an_idx = find_analogue(date, pcp)
     if np.isnan(an_idx):
         an_best_mp.append(('nan', np.nan, date, np.nan))
         an_best_pbl.append(('nan', np.nan, date, np.nan))
     else:
         print('Analogue date selected '+str(vtimes_pcp[an_idx]))
         # Get the analogue's verification
+        fcst_smooth = gaussian_filter(pcp['mean'].sel(time=date), pcp.attrs['sigma'])
         analogue_time = vtimes_pcp[an_idx] + pd.Timedelta(hours=param['forecast_hour'])
         st4_an = stage4.total_precipitation.sel(
             time=analogue_time,
