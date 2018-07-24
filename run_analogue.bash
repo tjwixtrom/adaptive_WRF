@@ -27,7 +27,7 @@ thresh=${thresholds[${thresh_idx}]}
 stdev=${stdevs[${stdevs_idx}]}
 
 method="rmse"
-save_dir=/home/twixtrom/analogue_analysis/${method}/${thresh}/std${stdev}
+save_dir=/home/twixtrom/analogue_analysis/${method}/${thresh}/std${stdev}/
 mkdir -p ${save_dir}
 python_exec=/home/twixtrom/miniconda3/envs/analogue/bin/python
 runscript=/home/twixtrom/analogue_algorithm/test_analogue.py

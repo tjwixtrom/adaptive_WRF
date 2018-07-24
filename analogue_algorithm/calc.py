@@ -8,9 +8,11 @@
 # Code for caclulation of analogue score for inclusion in adaptive ensemble forecasts.
 #
 ##############################################################################################
-from dask.diagnostics import ProgressBar
-from datetime import timedelta
+# from datetime import timedelta
+
 import numpy as np
+import pandas as pd
+from dask.diagnostics import ProgressBar
 from scipy.ndimage import gaussian_filter
 
 
@@ -54,7 +56,8 @@ def find_analogue_rmse(forecast_date, dataset, threshold, sigma):
     fcst_masked = fcst_mean.where(fcst_smooth >= threshold)
 
     # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-    dataset_mean = dataset['mean'].where(dataset.time < forecast_date, drop=True)
+    dataset_mean = dataset['mean'].where(dataset.time < np.datetime64(forecast_date),
+                                         drop=True)
     dataset_mean_masked = dataset_mean.where(fcst_smooth >= threshold)
 
     # Actually find the index of the closest analogue
@@ -70,27 +73,28 @@ def verify_members(dataset, observations, parameters):
     """
     Calculates the sum of RMSE for each dataset member over the specified time range
 
-    :param dataset: input forecast xarray dataset
-    :param observations: observations xarray dataset
+    :param dataset: xarray dataset. Input forecast dataset
+    :param observations: xarray dataset. Observations dataset
     :param parameters: dict. Dictionary of parameter values as below
-              forecast_hour: valid forecast hour of forecast dataset
-              threshold: threshold for verification masking
-              sigma: standard deviation of guassian filter
-              start_date: start date of verification period
-              end_date: end date of verification period
+              forecast_hour: float. Valid forecast hour of forecast dataset
+              threshold: float. Threshold for verification masking
+              sigma: float. Standard deviation of guassian filter
+              start_date: str. Start date of verification period
+              end_date: str. End date of verification period
     :return: Sum of RMSE for each member over verification period
     """
     tot_rmse = {}
     mem_list = [mem for mem in dataset.data_vars.keys()]
-    print(mem_list)
     if 'mean' in mem_list:
         mem_list.remove('mean')
     for mem in mem_list:
         tot_rmse[mem] = []
 
-    date = parameters['start_date']
-    while date <= parameters['end_date']:
-        obs_date = date + timedelta(hours=parameters['forecast_hour'])
+    dates = pd.date_range(start=parameters['start_date'],
+                          end=parameters['end_date'],
+                          freq=parameters['dt'])
+    for date in dates:
+        obs_date = date + pd.Timedelta(hours=parameters['forecast_hour'])
         obs_data = observations.sel(time=obs_date)
         obs_smooth = gaussian_filter(obs_data, parameters['sigma'])
         for mem in mem_list:
@@ -100,5 +104,4 @@ def verify_members(dataset, observations, parameters):
                                             obs_data.where(
                                                 obs_smooth >= parameters['threshold']).values
                                             )
-        date += timedelta(days=1)
     return tot_rmse

@@ -17,19 +17,20 @@
 # 20 July 2018
 #
 ##############################################################################################
-
-from datetime import datetime, timedelta
-from netCDF4 import num2date
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import sys
-from scipy.ndimage import gaussian_filter
 import warnings
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import xarray as xr
+from netCDF4 import num2date
+from scipy.ndimage import gaussian_filter
 
 from analogue_algorithm.calc import rmse, find_analogue_rmse, verify_members
 from analogue_algorithm.plots import plot_panels
+
 warnings.filterwarnings("ignore")
 plt.switch_backend('agg')
 
@@ -40,16 +41,18 @@ param = {
     'method': 'rmse',
     'forecast_hour': 48,
     'threshold': float(sys.argv[2]),
-    'start_date': datetime(2015, 1, 1, 12),
-    'an_start_date': datetime(2015, 10, 1, 12),
-    'an_end_date': datetime(2015, 12, 29, 12),
+    'start_date': '2015-01-01T12:00:00',
+    'an_start_date': '2015-10-01T12:00:00',
+    'an_end_date': '2015-12-29T12:00:00',
+    'dt': '1D'
 }
 verif_param = {
     'forecast_hour': 48,
     'threshold': 0.5,
     'sigma': 2,
-    'start_date': datetime(2015, 1, 1, 12),
-    'end_date': datetime(2015, 9, 30, 12)
+    'start_date': '2015-01-01T12:00:00',
+    'end_date': '2015-09-30T12:00:00',
+    'dt': '1D'
 }
 
 if param['domain'] == '1':
@@ -98,8 +101,10 @@ pcp['mean'] = fcst_mean
 
 an_best_mp = []
 an_best_pbl = []
-date = param['an_start_date']
-while date <= param['an_end_date']:
+dates = pd.date_range(start=param['an_start_date'],
+                      end=param['an_end_date'],
+                      freq=param['dt'])
+for date in dates:
     print('Starting date '+str(date))
     an_idx, fcst_smooth = find_analogue_rmse(date, pcp, param['threshold'], param['sigma'])
     if np.isnan(an_idx):
@@ -108,7 +113,7 @@ while date <= param['an_end_date']:
     else:
         print('Analogue date selected '+str(vtimes_pcp[an_idx]))
         # Get the analogue's verification
-        analogue_time = vtimes_pcp[an_idx] + timedelta(hours=param['forecast_hour'])
+        analogue_time = vtimes_pcp[an_idx] + pd.Timedelta(hours=param['forecast_hour'])
         st4_an = stage4.total_precipitation.sel(
             time=analogue_time,
             drop=True
@@ -145,7 +150,7 @@ while date <= param['an_end_date']:
             best_pbl = 'nan'
 
         # Find actual best verifying members
-        st4_fcst_date = date + timedelta(hours=param['forecast_hour'])
+        st4_fcst_date = date + pd.Timedelta(hours=param['forecast_hour'])
         st4_verif = stage4.total_precipitation.sel(
             time=st4_fcst_date,
             drop=True
@@ -192,7 +197,6 @@ while date <= param['an_end_date']:
         else:
             rank_pbl = np.where(sorted_pbl == best_pbl)[0][0]
             an_best_pbl.append((best_pbl, rank_pbl, date, vtimes_pcp[an_idx]))
-    date += timedelta(days=1)
 
 print('Writing output to file')
 np.save(outname_mp, an_best_mp)
@@ -225,7 +229,7 @@ ax.set_title('Histogram of Observed Analogue MP Scheme Selection')
 ax2.hist(an_pbl, bins=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
          range=(0, 10), facecolor='orange', align='left', rwidth=0.3)
 ax2.set_title('Histogram of Observed Analogue PBL Scheme Selection')
-plt.savefig(param['directory']+param['method']+'_'+param['threshold']+'_std' +
+plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
             '_mem_selection.png')
 
@@ -245,7 +249,7 @@ ax2.hist(np.array(pbl_ranks) + 1, bins=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
          range=(0, 10), facecolor='orange', align='left', rwidth=0.5)
 ax2.set_title('Histogram of Observed Analogue PBL Member Ranking')
 ax2.set_xticks(ticks)
-plt.savefig(param['directory']+param['method']+'_'+param['threshold']+'_std' +
+plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
             '_ranks.png')
 
@@ -269,7 +273,7 @@ for i in range(len(an_dates)):
         rmse_best_pbl.append(np.nan)
     else:
         date = an_dates[i]
-        st4_date = date + timedelta(hours=param['forecast_hour'])
+        st4_date = date + pd.Timedelta(hours=param['forecast_hour'])
 
         # Smooth and mask observed precip
         st4_smooth = gaussian_filter(stage4[
@@ -309,7 +313,7 @@ for i in range(len(an_dates)):
         rmse_best_mp.append(np.nan)
     else:
         date = an_dates[i]
-        st4_date = date + timedelta(hours=param['forecast_hour'])
+        st4_date = date + pd.Timedelta(hours=param['forecast_hour'])
 
         # Smooth and mask observed precip
         st4_smooth = gaussian_filter(stage4[
@@ -357,7 +361,7 @@ ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d-%y'))
 ax.xaxis.set_minor_locator(mdates.DayLocator())
 plt.legend(shadow=True, fontsize='large', loc=0)
 plt.grid()
-plt.savefig(param['directory']+param['method']+'_'+param['threshold']+'_std' +
+plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
             '_an_vs_best_mp.png')
 
@@ -377,7 +381,7 @@ ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d-%y'))
 ax.xaxis.set_minor_locator(mdates.DayLocator())
 plt.legend(shadow=True, fontsize='large', loc=0)
 plt.grid()
-plt.savefig(param['directory']+param['method']+'_'+param['threshold']+'_std' +
+plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
             '_an_vs_best_pbl.png')
 print('Analogue Analysis Completed')

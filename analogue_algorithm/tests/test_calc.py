@@ -14,6 +14,7 @@ from numpy.testing import assert_array_almost_equal, assert_almost_equal
 from analogue_algorithm.calc import rmse, find_analogue_rmse, verify_members
 from datetime import datetime
 import xarray as xr
+import pandas as pd
 
 
 def test_rmse_no_diff():
@@ -42,10 +43,13 @@ def test_rmse_axis():
 
 def test_find_analogue_rmse():
     """tests the find_analogue_rmse function"""
-    date = datetime(2016, 1, 1, 12)
-    date_array = np.array([datetime(2015, 12, 28, 12), datetime(2015, 12, 29, 12),
-                           datetime(2015, 12, 30, 12), datetime(2015, 12, 31, 12),
-                           datetime(2016, 1, 1, 12)])
+    # date = datetime(2016, 1, 1, 12)
+    # date_array = np.array([datetime(2015, 12, 28, 12), datetime(2015, 12, 29, 12),
+    #                        datetime(2015, 12, 30, 12), datetime(2015, 12, 31, 12),
+    #                        datetime(2016, 1, 1, 12)])
+    date_array = pd.date_range(start='2015-12-28T12:00:00',
+                               end='2016-01-01T12:00:00',
+                               freq='1D')
     data = np.ones((5, 10, 10)) * np.linspace(0, 50, 500).reshape(5, 10, 10)
     lat = np.linspace(40, 45, 10)
     lon = np.linspace(-105, -100, 10)
@@ -54,7 +58,7 @@ def test_find_analogue_rmse():
                          coords={'time': date_array,
                                  'lat': (['latitude', 'longitude'], mlat),
                                  'lon': (['latitude', 'longitude'], mlon)})
-    an_idx, fcst_smooth = find_analogue_rmse(date, dataset, 10, 5)
+    an_idx, fcst_smooth = find_analogue_rmse(date_array[-1], dataset, 10, 5)
     assert_almost_equal(an_idx, 3, 4)
 
 
@@ -63,10 +67,13 @@ def test_verif_members():
         'forecast_hour': 0,
         'threshold': 10,
         'sigma': 2,
-        'start_date': datetime(2015, 12, 28, 12),
-        'end_date': datetime(2015, 12, 29, 12)
+        'start_date': '2015-12-28T12:00:00',
+        'end_date': '2015-12-29T12:00:00',
+        'dt': '1D'
     }
-    date_array = np.array([datetime(2015, 12, 28, 12), datetime(2015, 12, 29, 12)])
+    date_array = pd.date_range(start=param['start_date'],
+                               end=param['end_date'],
+                               freq=param['dt'])
     data = np.ones((2, 5, 5)) * np.linspace(5, 30, 50).reshape(2, 5, 5)
     lat = np.linspace(40, 45, 5)
     lon = np.linspace(-105, -100, 5)
