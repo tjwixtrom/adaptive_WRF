@@ -37,18 +37,22 @@ def rmse(predictions, targets, axis=None, nan=False):
     return rmse_data
 
 
-def find_analogue_rmse(forecast_date, dataset, threshold, sigma):
+def find_analogue(forecast_date, dataset):
     """
     Finds the index value of the closest analogue within the input dataset
 
     :param forecast_date: datetime object or numpy.datetime64 object for forecast date.
         Forecast date should be included within dataset.
-    :param dataset: xarray dataset of analgoue forecasts. Ensemble mean should be
-        named 'mean' in the dataset.
-    :param threshold: float. Threshold for masking smoothed forecast field.
-    :param sigma: float. Standard deviation of gaussian filter to use for smoothing.
+    :param parameters: dict. Dictionary with project parameters. Should include 'threshold'
+        and 'sigma' values.
+    :param args: xarray datasets containing analgoue forecasts. Ensemble mean should be
+        named 'mean' in each dataset. One dataset for each variable. Dataset dimensions
+        should include initialized time, forecast hour, latitude, and longitude.
     :return: index of closest analogue
     """
+    sigma = dataset.sigma
+    threshold = dataset.threshold
+
     fcst_mean = dataset['mean'].sel(time=forecast_date, drop=True)
 
     # Smooth and mask forecast mean

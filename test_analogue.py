@@ -28,7 +28,7 @@ import xarray as xr
 from netCDF4 import num2date
 from scipy.ndimage import gaussian_filter
 
-from analogue_algorithm.calc import rmse, find_analogue_rmse, verify_members
+from analogue_algorithm.calc import rmse, find_analogue, verify_members
 from analogue_algorithm.plots import plot_panels
 
 warnings.filterwarnings("ignore")
@@ -85,6 +85,8 @@ pcp.coords['time'] = np.array([np.datetime64(date) for date in vtimes_pcp])
 pcp['time'] = np.array([np.datetime64(date) for date in vtimes_pcp])
 pcp.coords['lat'] = pcp.lat
 pcp.coords['lon'] = pcp.lon
+pcp.attrs['threshold'] = param['threshold']
+pcp.attrs['sigma'] = param['sigma']
 
 
 stage4 = xr.open_dataset(obsfile, chunks={'time': 1}, decode_cf=False)
@@ -106,7 +108,7 @@ dates = pd.date_range(start=param['an_start_date'],
                       freq=param['dt'])
 for date in dates:
     print('Starting date '+str(date))
-    an_idx, fcst_smooth = find_analogue_rmse(date, pcp, param['threshold'], param['sigma'])
+    an_idx, fcst_smooth = find_analogue(date, pcp)
     if np.isnan(an_idx):
         an_best_mp.append(('nan', np.nan, date, np.nan))
         an_best_pbl.append(('nan', np.nan, date, np.nan))
