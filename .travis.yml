@@ -17,7 +17,7 @@ before_install:
   - sudo ln -s /run/shm /dev/shm
 # Install packages
 install:
-  - conda env create
+  - conda create -n analogue python=3.6 numpy pandas xarray
   - source activate analogue
   - python setup.py install
 # command to run tests
