@@ -1,0 +1,25 @@
+language: python
+python:
+  - "3.6"
+  - "3.6-dev"  # 3.6 development branch
+  - "3.7-dev"  # 3.7 development branch
+# command to install dependencies
+install:
+  - sudo apt-get update
+  # We do this conditionally because it saves us some downloading if the
+  # version is the same.
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  # Useful for debugging any issues with conda
+  - conda info -a
+
+  # Replace dep1 dep2 ... with your dependencies
+  - conda env create
+  - source activate analogue
+  - python setup.py install
+# command to run tests
+script:
+  - pytest # or py.test for Python versions 3.5 and below
