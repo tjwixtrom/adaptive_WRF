@@ -4,6 +4,7 @@ setup(
     name='Analogue Algorithm',
     version='0.1',
     packages=['analogue_algorithm'],
+    requires=['netcdf4', 'numpy', 'scipy', 'dask', 'xarray', 'pandas'],
     url='',
     license='BSD-3',
     author='Tyler Wixtrom',

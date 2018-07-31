@@ -5,6 +5,8 @@ dependencies:
    - python=3.6
    - numpy
    - scipy
+   - pandas
+   - dask
    - matplotlib
    - cartopy
    - netcdf4

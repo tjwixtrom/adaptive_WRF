@@ -25,6 +25,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
+import operator
+from dask.diagnostics import ProgressBar
 from netCDF4 import num2date
 from scipy.ndimage import gaussian_filter
 
@@ -34,18 +36,26 @@ from analogue_algorithm.plots import plot_panels
 warnings.filterwarnings("ignore")
 plt.switch_backend('agg')
 
+# chunks = {'time': 10}
+chunks = None
 param = {
     'domain': sys.argv[1],
-    'sigma': float(sys.argv[3]),
-    'directory': sys.argv[4],
-    'method': 'rmse',
+    'sigma': 2.,
+    'directory': sys.argv[3],
+    'method': sys.argv[2],
     'forecast_hour': 48,
-    'threshold': float(sys.argv[2]),
+    'pcp_threshold': 1.,
+    'pcp_operator': operator.ge,
+    'dewpt_threshold': 10.,
+    'dewpt_operator': operator.ge,
+    'mslp_threshold': 1000.,
+    'mslp_operator': operator.le,
     'start_date': '2015-01-01T12:00:00',
     'an_start_date': '2015-10-01T12:00:00',
     'an_end_date': '2015-12-29T12:00:00',
     'dt': '1D'
-}
+    }
+
 verif_param = {
     'forecast_hour': 48,
     'threshold': 0.5,
@@ -53,23 +63,23 @@ verif_param = {
     'start_date': '2015-01-01T12:00:00',
     'end_date': '2015-09-30T12:00:00',
     'dt': '1D'
-}
+    }
 
 if param['domain'] == '1':
-    datafile = '/lustre/work/twixtrom/adp_dataset_12km_48h_pcp.nc'
-    obsfile = '/lustre/work/twixtrom/ST4_2015_03h.nc'
-    outname_mp = param['directory']+'mp_an_ranks_12km_48h_'+param['method']+'_' + \
-        str(param['threshold'])+'_std'+str(param['sigma'])+'.npy'
-    outname_pbl = param['directory']+'pbl_an_ranks_12km_48h_'+param['method'] + \
-        '_'+str(param['threshold'])+'_std'+str(param['sigma'])+'.npy'
+    pcpfile = '/lustre/scratch/twixtrom/adp_dataset_12km_timestep_pcp_f48.nc'
+    dewptfile = '/lustre/scratch/twixtrom/adp_dataset_12km_dewpt_2m_f48.nc'
+    mslpfile = '/lustre/scratch/twixtrom/adp_dataset_12km_mslp_f48.nc'
+    obsfile = '/lustre/scratch/twixtrom/ST4_2015_03h.nc'
+    outname_mp = param['directory']+'mp_an_ranks_12km_48h_'+param['method']+'.npy'
+    outname_pbl = param['directory']+'pbl_an_ranks_12km_48h_'+param['method']+'.npy'
 
-elif param['domain'] == '2':
-    datafile = '/lustre/work/twixtrom/adp_dataset_4km_48h_pcp.nc'
-    obsfile = '/lustre/work/twixtrom/ST4_2015_01h.nc'
-    outname_mp = param['directory']+'mp_an_ranks_4km_48h_'+param['method']+'_' + \
-        str(param['threshold'])+'_std'+str(param['sigma'])+'.npy'
-    outname_pbl = param['directory']+'pbl_an_ranks_4km_48h_'+param['method']+'_' + \
-        str(param['threshold'])+'_std'+str(param['sigma'])+'.npy'
+# elif param['domain'] == '2':
+#     datafile = '/lustre/work/twixtrom/adp_dataset_4km_48h_pcp.nc'
+#     obsfile = '/lustre/work/twixtrom/ST4_2015_01h.nc'
+#     outname_mp = param['directory']+'mp_an_ranks_4km_48h_'+param['method']+'_' + \
+#         str(param['threshold'])+'_std'+str(param['sigma'])+'.npy'
+#     outname_pbl = param['directory']+'pbl_an_ranks_4km_48h_'+param['method']+'_' + \
+#         str(param['threshold'])+'_std'+str(param['sigma'])+'.npy'
 
 else:
     raise ValueError('Domain not defined')
@@ -78,55 +88,100 @@ mem_list = ['mem'+str(i) for i in range(1, 21)]
 mp_list = ['mem'+str(i) for i in range(1, 11)]
 pbl_list = ['mem'+str(i) for i in range(11, 21)]
 
-print('Opening Dataset')
-pcp = xr.open_dataset(datafile, chunks={'time': 1}, decode_cf=False)
-vtimes_pcp = num2date(pcp.time, pcp.time.units)
-pcp.coords['time'] = np.array([np.datetime64(date) for date in vtimes_pcp])
-pcp['time'] = np.array([np.datetime64(date) for date in vtimes_pcp])
-pcp.coords['lat'] = pcp.lat
-pcp.coords['lon'] = pcp.lon
-pcp.attrs['threshold'] = param['threshold']
-pcp.attrs['sigma'] = param['sigma']
+print('Opening Dataset', flush=True)
 
 
-stage4 = xr.open_dataset(obsfile, chunks={'time': 1}, decode_cf=False)
+def open_pcp():
+    precip = xr.open_dataset(pcpfile, chunks=chunks)
+    precip.attrs['threshold'] = param['pcp_threshold']
+    precip.attrs['sigma'] = param['sigma']
+    precip.attrs['operator'] = param['pcp_operator']
+    fcst_mean = xr.concat([precip[mem] for mem in mem_list],
+                          dim='Member').mean(dim='Member')
+    precip['mean'] = fcst_mean
+    return precip.where(precip.time < np.datetime64('2016-01-01T12:00:00'), drop=True)
+
+
+def open_dewpt():
+    dew = xr.open_dataset(dewptfile, chunks=chunks)
+    dew.attrs['threshold'] = param['dewpt_threshold']
+    dew.attrs['sigma'] = param['sigma']
+    dew.attrs['operator'] = param['dewpt_operator']
+    dew_mean = xr.concat([dew[mem] for mem in mem_list],
+                           dim='Member').mean(dim='Member')
+    dew['mean'] = dew_mean
+    return dew
+
+
+def open_mslp():
+    slp = xr.open_dataset(mslpfile, chunks=chunks)
+    slp.attrs['threshold'] = param['mslp_threshold']
+    slp.attrs['sigma'] = param['sigma']
+    slp.attrs['operator'] = param['mslp_operator']
+    slp_mean = xr.concat([slp[mem] for mem in mem_list],
+                          dim='Member').mean(dim='Member')
+    slp['mean'] = slp_mean
+    return slp
+
+
+if param['method'] == 'rmse_pcp':
+    pcp = open_pcp()
+elif param['method'] == 'rmse_pcp+dewpt':
+    pcp = open_pcp()
+    dewpt = open_dewpt()
+elif param['method'] == 'rmse_pcp+dewpt+mslp':
+    pcp = open_pcp()
+    dewpt = open_dewpt()
+    mslp = open_mslp()
+else:
+    raise ValueError('Method not defined')
+
+stage4 = xr.open_dataset(obsfile, chunks=chunks, decode_cf=False)
 vtimes_stage4 = num2date(stage4.valid_times, stage4.valid_times.units)
 stage4.coords['time'] = np.array([np.datetime64(date) for date in vtimes_stage4])
 stage4['time'] = np.array([np.datetime64(date) for date in vtimes_stage4])
 stage4.coords['lat'] = stage4.lat
 stage4.coords['lon'] = stage4.lon
 
+# Create empty analogue output lists and time range to iterate over
 an_best_mp = []
 an_best_pbl = []
 dates = pd.date_range(start=param['an_start_date'],
                       end=param['an_end_date'],
                       freq=param['dt'])
 
-fcst_mean = xr.concat([pcp[mem] for mem in pcp.data_vars.keys()],
-                      dim='Member').mean(dim='Member')
-pcp['mean'] = fcst_mean
-
 for date in dates:
-    print('Starting date '+str(date))
-    an_idx = find_analogue(date, pcp)
+    print('Starting date '+str(date), flush=True)
+    if param['method'] == 'rmse_pcp':
+        with ProgressBar():
+            an_idx = find_analogue(date, pcp)
+    elif param['method'] == 'rmse_pcp+dewpt':
+        with ProgressBar():
+            an_idx = find_analogue(date, pcp, dewpt)
+    elif param['method'] == 'rmse_pcp+dewpt+mslp':
+        with ProgressBar():
+            an_idx = find_analogue(date, pcp, dewpt, mslp)
+    else:
+        raise ValueError('Method not defined')
+
     if np.isnan(an_idx):
         an_best_mp.append(('nan', np.nan, date, np.nan))
         an_best_pbl.append(('nan', np.nan, date, np.nan))
     else:
-        print('Analogue date selected '+str(vtimes_pcp[an_idx]))
+        print('Analogue date selected '+str(pcp.time[an_idx]), flush=True)
         # Get the analogue's verification
         fcst_smooth = gaussian_filter(pcp['mean'].sel(time=date), pcp.attrs['sigma'])
-        analogue_time = vtimes_pcp[an_idx] + pd.Timedelta(hours=param['forecast_hour'])
+        analogue_time = pcp.time.isel(time=an_idx) + pd.Timedelta(hours=param['forecast_hour'])
         st4_an = stage4.total_precipitation.sel(
             time=analogue_time,
             drop=True
-            ).where(fcst_smooth >= param['threshold'])
+            ).where(fcst_smooth >= param['pcp_threshold'])
 
         # Find best member for analouge date by RMSE
         # for MP members
         an_rmse_mp = []
         for mem in mp_list:
-            mem_data = pcp[mem][an_idx, ].where(fcst_smooth >= param['threshold'])
+            mem_data = pcp[mem][an_idx, ].where(fcst_smooth >= param['pcp_threshold'])
             rmse_mem = rmse(mem_data, st4_an)
             an_rmse_mp.append(rmse_mem)
         an_mp = np.array(an_rmse_mp)
@@ -134,7 +189,7 @@ for date in dates:
         # for PBL members
         an_rmse_pbl = []
         for mem in pbl_list:
-            mem_data = pcp[mem][an_idx, ].where(fcst_smooth >= param['threshold'])
+            mem_data = pcp[mem][an_idx, ].where(fcst_smooth >= param['pcp_threshold'])
             rmse_mem = rmse(mem_data, st4_an)
             an_rmse_pbl.append(rmse_mem)
         an_pbl = np.array(an_rmse_pbl)
@@ -154,19 +209,25 @@ for date in dates:
 
         # Find actual best verifying members
         st4_fcst_date = date + pd.Timedelta(hours=param['forecast_hour'])
+        st4 = stage4.total_precipitation.sel(time=st4_fcst_date, drop=True)
+        st4_smooth = gaussian_filter(st4, verif_param['sigma'])
         st4_verif = stage4.total_precipitation.sel(
             time=st4_fcst_date,
             drop=True
-            ).where(fcst_smooth >= param['threshold'])
-
+            )
         # For MP members
         verif_mp = []
         for mem in mp_list:
             mem_data = pcp[mem].sel(
                 time=date,
                 drop=True
-                ).where(fcst_smooth >= param['threshold'])
-            rmse_mem = rmse(mem_data, st4_verif)
+                )
+            rmse_from_obs = rmse(mem_data.where(st4_smooth >= verif_param['threshold']),
+                                 st4_verif.where(st4_smooth >= verif_param['threshold']))
+            mem_smooth = gaussian_filter(mem_data, verif_param['sigma'])
+            rmse_from_fcst = rmse(mem_data.where(mem_smooth >= verif_param['threshold']),
+                                  st4_verif.where(mem_smooth >= verif_param['threshold']))
+            rmse_mem = (rmse_from_fcst + rmse_from_obs) / 2.
             verif_mp.append(rmse_mem)
         verif_members_mp = np.array(verif_mp)
 
@@ -178,7 +239,7 @@ for date in dates:
             an_best_mp.append(('nan', np.nan, date, np.nan))
         else:
             rank_mp = np.where(sorted_mp == best_mp)[0][0]
-            an_best_mp.append((best_mp, rank_mp, date, vtimes_pcp[an_idx]))
+            an_best_mp.append((best_mp, rank_mp, date, pcp.time[an_idx].values))
 
         # For PBL members
         verif_pbl = []
@@ -186,10 +247,15 @@ for date in dates:
             mem_data = pcp[mem].sel(
                 time=date,
                 drop=True
-                ).where(fcst_smooth >= param['threshold'])
-            rmse_mem = rmse(mem_data, st4_verif)
+            )
+            rmse_from_obs = rmse(mem_data.where(st4_smooth >= verif_param['threshold']),
+                                 st4_verif.where(st4_smooth >= verif_param['threshold']))
+            mem_smooth = gaussian_filter(mem_data, verif_param['sigma'])
+            rmse_from_fcst = rmse(mem_data.where(mem_smooth >= verif_param['threshold']),
+                                  st4_verif.where(mem_smooth >= verif_param['threshold']))
+            rmse_mem = (rmse_from_fcst + rmse_from_obs) / 2.
             verif_pbl.append(rmse_mem)
-        verif_members_pbl = np.array(verif_pbl)
+        verif_members_pbl = np.array(verif_mp)
 
         # Sort members by performance
         sorted_pbl = np.array(pbl_list)[np.argsort(verif_members_pbl)]
@@ -199,13 +265,13 @@ for date in dates:
             an_best_pbl.append(('nan', np.nan, date, np.nan))
         else:
             rank_pbl = np.where(sorted_pbl == best_pbl)[0][0]
-            an_best_pbl.append((best_pbl, rank_pbl, date, vtimes_pcp[an_idx]))
+            an_best_pbl.append((best_pbl, rank_pbl, date, pcp.time[an_idx].values))
 
-print('Writing output to file')
+print('Writing output to file', flush=True)
 np.save(outname_mp, an_best_mp)
 np.save(outname_pbl, an_best_pbl)
 
-print('Analyzing Output')
+print('Analyzing Output', flush=True)
 mp_ranks = []
 for case in an_best_mp:
     mp_ranks.append(case[1])
@@ -217,7 +283,7 @@ for case in an_best_pbl:
 an_pbl = [case[0] for case in an_best_pbl]
 an_mp = [case[0] for case in an_best_mp]
 
-print('Generating Histograms')
+print('Generating Histograms', flush=True)
 xlab = 'Member'
 ylab = 'Selected Frequency'
 ax, ax2 = plot_panels((16, 16), (2, 2), 2,
@@ -232,9 +298,10 @@ ax.set_title('Histogram of Observed Analogue MP Scheme Selection')
 ax2.hist(an_pbl, bins=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
          range=(0, 10), facecolor='orange', align='left', rwidth=0.3)
 ax2.set_title('Histogram of Observed Analogue PBL Scheme Selection')
-plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
-            str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
-            '_mem_selection.png')
+# plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
+#             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
+#             '_mem_selection.png')
+plt.savefig(param['directory']+param['method']+'_d01_mem_selection.png')
 
 xlab = 'Ranking'
 ylab = 'Observed Frequency'
@@ -252,25 +319,25 @@ ax2.hist(np.array(pbl_ranks) + 1, bins=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
          range=(0, 10), facecolor='orange', align='left', rwidth=0.5)
 ax2.set_title('Histogram of Observed Analogue PBL Member Ranking')
 ax2.set_xticks(ticks)
-plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
-            str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
-            '_ranks.png')
+# plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
+#             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
+#             '_ranks.png')
+plt.savefig(param['directory']+param['method']+'_d01_ranks.png')
 
 # Find average best member
-print('Finding Best Member')
-tot_rmse = verify_members(pcp, stage4.total_precipitation, verif_param)
+print('Finding Best Member', flush=True)
+tot_rmse = verify_members(pcp, stage4.total_precipitation, verif_param, mem_list)
 
 mean_best_mp = mp_list[np.array([tot_rmse[mem]] for mem in mp_list).argmin()]
 mean_best_pbl = pbl_list[np.array([tot_rmse[mem]] for mem in pbl_list).argmin()]
 
 # Compare analogue physics with average best physics
-print('Generating Timeseries')
+print('Generating Timeseries', flush=True)
 rmse_an_pbl = []
 rmse_best_pbl = []
 an_pbl_mem = [case[0] for case in an_best_pbl]
 an_dates = [case[-2] for case in an_best_pbl]
 for i in range(len(an_dates)):
-    # find index for current data, use all data up to that point
     if an_pbl_mem[i] == 'nan':
         rmse_an_pbl.append(np.nan)
         rmse_best_pbl.append(np.nan)
@@ -290,19 +357,23 @@ for i in range(len(an_dates)):
                             ].sel(
                                   time=st4_date,
                                   drop=True
-                                  ).where(st4_smooth >= param['threshold'])
+                                  )
 
-        # get analogue precip and MYNN precip
-        an_pcp = pcp[an_pbl_mem[i]].sel(
-                                        time=date,
-                                        drop=True
-                                        ).where(st4_smooth >= param['threshold'])
-        best_pcp = pcp[mean_best_pbl].sel(
-                                          time=date,
-                                          drop=True
-                                          ).where(st4_smooth >= param['threshold'])
-        rmse_an_pbl.append(rmse(an_pcp, st4_verif))
-        rmse_best_pbl.append(rmse(best_pcp, st4_verif))
+        # get analogue precip and best precip
+        an_pcp = pcp[an_pbl_mem[i]].sel(time=date, drop=True)
+        best_pcp = pcp[mean_best_pbl].sel(time=date, drop=True)
+        an_rmse_from_obs = rmse(an_pcp.where(st4_smooth >= verif_param['threshold']),
+                                st4_verif.where(st4_smooth >= verif_param['threshold']))
+        best_rmse_from_obs = rmse(best_pcp.where(st4_smooth >= verif_param['threshold']),
+                                  st4_verif.where(st4_smooth >= verif_param['threshold']))
+        fcst_smooth = gaussian_filter(pcp['mean'].sel(time=date, drop=True),
+                                      verif_param['sigma'])
+        an_rmse_from_fcst = rmse(an_pcp.where(fcst_smooth >= verif_param['threshold']),
+                                 st4_verif.where(fcst_smooth >= verif_param['threshold']))
+        best_rmse_from_fcst = rmse(best_pcp.where(fcst_smooth >= verif_param['threshold']),
+                                   st4_verif.where(fcst_smooth >= verif_param['threshold']))
+        rmse_an_pbl.append((an_rmse_from_fcst + an_rmse_from_obs) / 2.)
+        rmse_best_pbl.append((best_rmse_from_fcst + best_rmse_from_obs) / 2.)
 
 
 # For MP Members
@@ -310,7 +381,6 @@ rmse_an_mp = []
 rmse_best_mp = []
 an_mp_mem = [case[0] for case in an_best_mp]
 for i in range(len(an_dates)):
-    # find index for current data, use all data up to that point
     if an_mp_mem[i] == 'nan':
         rmse_an_mp.append(np.nan)
         rmse_best_mp.append(np.nan)
@@ -325,27 +395,26 @@ for i in range(len(an_dates)):
                                                   time=st4_date,
                                                   drop=True
                                                   ), param['sigma'])
-        st4_verif = stage4[
-                            'total_precipitation'
-                            ].sel(
-                                  time=st4_date,
-                                  drop=True
-                                  ).where(st4_smooth >= param['threshold'])
+        st4_verif = stage4['total_precipitation'].sel(time=st4_date, drop=True)
 
         # get analogue precip and MYNN precip
-        an_pcp = pcp[an_mp_mem[i]].sel(
-                                       time=date,
-                                       drop=True
-                                       ).where(st4_smooth >= param['threshold'])
-        best_pcp = pcp[mean_best_mp].sel(
-                                         time=date,
-                                         drop=True
-                                         ).where(st4_smooth >= param['threshold'])
-        rmse_an_mp.append(rmse(an_pcp, st4_verif))
-        rmse_best_mp.append(rmse(best_pcp, st4_verif))
+        an_pcp = pcp[an_mp_mem[i]].sel(time=date, drop=True)
+        best_pcp = pcp[mean_best_mp].sel(time=date, drop=True)
+        an_rmse_from_obs = rmse(an_pcp.where(st4_smooth >= verif_param['threshold']),
+                                st4_verif.where(st4_smooth >= verif_param['threshold']))
+        best_rmse_from_obs = rmse(best_pcp.where(st4_smooth >= verif_param['threshold']),
+                                  st4_verif.where(st4_smooth >= verif_param['threshold']))
+        fcst_smooth = gaussian_filter(pcp['mean'].sel(time=date, drop=True),
+                                      verif_param['sigma'])
+        an_rmse_from_fcst = rmse(an_pcp.where(fcst_smooth >= verif_param['threshold']),
+                                 st4_verif.where(fcst_smooth >= verif_param['threshold']))
+        best_rmse_from_fcst = rmse(best_pcp.where(fcst_smooth >= verif_param['threshold']),
+                                   st4_verif.where(fcst_smooth >= verif_param['threshold']))
+        rmse_an_mp.append((an_rmse_from_fcst + an_rmse_from_obs) / 2.)
+        rmse_best_mp.append((best_rmse_from_fcst + best_rmse_from_obs) / 2.)
 
 
-print('Making Plots')
+print('Making Plots', flush=True)
 fdates = [case[-2] for case in an_best_pbl]
 
 fig = plt.figure(figsize=(20, 10))
@@ -364,9 +433,10 @@ ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d-%y'))
 ax.xaxis.set_minor_locator(mdates.DayLocator())
 plt.legend(shadow=True, fontsize='large', loc=0)
 plt.grid()
-plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
-            str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
-            '_an_vs_best_mp.png')
+# plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
+#             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
+#             '_an_vs_best_mp.png')
+plt.savefig(param['directory']+param['method']+'_d01_an_vs_best_mp.png')
 
 fig = plt.figure(figsize=(20, 10))
 ax = fig.add_subplot(1, 1, 1)
@@ -384,7 +454,8 @@ ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d-%y'))
 ax.xaxis.set_minor_locator(mdates.DayLocator())
 plt.legend(shadow=True, fontsize='large', loc=0)
 plt.grid()
-plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
-            str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
-            '_an_vs_best_pbl.png')
-print('Analogue Analysis Completed')
+# plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
+#             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
+#             '_an_vs_best_pbl.png')
+plt.savefig(param['directory']+param['method']+'_d01_an_vs_best_pbl.png')
+print('Analogue Analysis Completed', flush=True)
