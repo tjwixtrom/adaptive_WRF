@@ -98,7 +98,7 @@ def verify_members(dataset, observations, parameters, mem_list):
     """
     tot_rmse = {}
     for mem in mem_list:
-        tot_rmse[mem] = []
+        tot_rmse[mem] = 0.
 
     dates = pd.date_range(start=parameters['start_date'],
                           end=parameters['end_date'],
@@ -120,7 +120,10 @@ def verify_members(dataset, observations, parameters, mem_list):
             rmse_from_fcst = rmse(mem_data.values, obs_data.where(
                                     fcst_smooth >= parameters['threshold']).values)
             mean_rmse = (rmse_from_fcst + rmse_from_obs) / 2.
-            tot_rmse[mem] = mem_rmse + mean_rmse
+            if np.isnan(mean_rmse):
+                tot_rmse[mem] = mem_rmse
+            else:
+                tot_rmse[mem] = mem_rmse + mean_rmse
     return tot_rmse
 
 

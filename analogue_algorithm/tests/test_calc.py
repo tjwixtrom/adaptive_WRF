@@ -78,8 +78,9 @@ def test_verif_members():
     lon = np.linspace(-105, -100, 5)
     mlon, mlat = np.meshgrid(lon, lat)
     mem_list = ['mem1', 'mem2']
-    dataset = xr.Dataset({'mem1': (['time', 'latitude', 'longitude'], data),
-                          'mem2': (['time', 'latitude', 'longitude'], data * 2.),
+    dataset = xr.Dataset({'mem1': (['time', 'latitude', 'longitude'], data * 2.),
+                          'mem2': (['time', 'latitude', 'longitude'], data),
+                          'mem3': (['time', 'latitude', 'longitude'], data * 1.5),
                           'mean': (['time', 'latitude', 'longitude'], data * 0.5)},
                          coords={'time': date_array,
                                  'lat': (['latitude', 'longitude'], mlat),
@@ -89,8 +90,9 @@ def test_verif_members():
                              'lat': (['latitude', 'longitude'], mlat),
                              'lon': (['latitude', 'longitude'], mlon)})
     tot_rmse = verify_members(dataset, obs.total_precipitation, param, mem_list)
-    best_mem = np.array([tot_rmse[mem]] for mem in mem_list).argmin()
-    assert_almost_equal(best_mem, 0, 4)
+    members = np.array([tot_rmse[mem] for mem in mem_list])
+    best_mem = members.argmin()
+    assert_almost_equal(best_mem, 1, 4)
 
 
 def test_find_analogue_multi_vars():

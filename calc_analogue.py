@@ -60,7 +60,8 @@ param = {
     'an_start_date': '2015-10-01T12:00:00',
     'an_end_date': '2015-12-29T12:00:00',
     'dt': '1D',
-    'comments': 'Calculate analogues for f36 on outer domain'
+    'comments': 'Calculate analogues for outer domain, now includes all PBL members (YSU'
+                'previously excluded)'
     }
 
 verif_param = {
@@ -100,7 +101,7 @@ else:
 
 mem_list = ['mem'+str(i) for i in range(1, 21)]
 mp_list = ['mem'+str(i) for i in range(1, 11)]
-pbl_list = ['mem'+str(i) for i in range(11, 21)]
+pbl_list = ['mem1', *['mem'+str(i) for i in range(11, 21)]]
 
 print('Opening Dataset', flush=True)
 
@@ -178,77 +179,77 @@ def open_height(hour, domain, dx):
 
 
 dom = float(param['domain'])
-if param['method'] == 'rmse_pcp':
-    pcp = open_pcp(36, dom, dx)
-elif param['method'] == 'rmse_pcpf48+dewptf48':
-    pcp = open_pcp(48, dom, dx)
-    dewpt = open_dewpt(48, dom, dx)
-elif param['method'] == 'rmse_pcpf48+dewptf48+mslpf48':
-    pcp = open_pcp(48, dom, dx)
-    dewpt = open_dewpt(48, dom, dx)
-    mslp = open_mslp(48, dom, dx)
-elif param['method'] == 'rmse_pcpf48+dewptf00':
-    pcp = open_pcp(48, dom, dx)
+if param['method'] == 'rmse_pcpT00':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+elif param['method'] == 'rmse_pcpT00+dewptT00':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    dewpt = open_dewpt(param['forecast_hour'], dom, dx)
+elif param['method'] == 'rmse_pcpT00+dewptT00+mslpT00':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    dewpt = open_dewpt(param['forecast_hour'], dom, dx)
+    mslp = open_mslp(param['forecast_hour'], dom, dx)
+elif param['method'] == 'rmse_pcpT00+dewptf00':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
     dewpt = open_dewpt(0, dom, dx)
-elif param['method'] == 'rmse_pcpf48+dewptf00+mslpf00':
-    pcp = open_pcp(48, dom, dx)
-    dewpt = open_dewpt(0, dom, dx)
-    mslp = open_mslp(0, dom, dx)
-elif param['method'] == 'rmse_pcpf48+capef45':
-    pcp = open_pcp(48, dom, dx)
-    cape = open_cape(45, dom, dx)
-elif param['method'] == 'rmse_pcpf48+dewptf45':
-    pcp = open_pcp(48, dom, dx)
-    dewpt = open_dewpt(45, dom, dx)
-elif param['method'] == 'pcp_area_rmse_pcpf48+dewptf45':
-    pcp = open_pcp(48, dom, dx)
-    dewpt = open_dewpt(45, dom, dx)
-elif param['method'] == 'pcp_area_rmse_pcpf48+dewptf45+mslpf45':
-    pcp = open_pcp(48, dom, dx)
-    dewpt = open_dewpt(45, dom, dx)
-    mslp = open_mslp(45, dom, dx)
-elif param['method'] == 'pcp_area_rmse_pcpf48+dewptf00+mslpf00':
-    pcp = open_pcp(48, dom, dx)
+elif param['method'] == 'rmse_pcpT00+dewptf00+mslpf00':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
     dewpt = open_dewpt(0, dom, dx)
     mslp = open_mslp(0, dom, dx)
-elif param['method'] == 'pcp_area_rmse_pcpf48+temp_2mf48':
-    pcp = open_pcp(48, dom, dx)
-    temp = open_temp(48, dom, dx)
-elif param['method'] == 'pcp_area_rmse_pcpf48+height_500hPaf48':
-    pcp = open_pcp(48, dom, dx)
-    height = open_height(48, dom, dx)
-elif param['method'] == 'pcp_area_rmse_pcpf48+hgt500f00+capef45':
-    pcp = open_pcp(48, dom, dx)
-    height = open_height(0, dom, dx)
-    cape = open_cape(45, dom, dx)
-elif param['method'] == 'rmse_pcpf48+hgt500f00+capef45':
-    pcp = open_pcp(48, dom, dx)
-    height = open_height(0, dom, dx)
-    cape = open_cape(45, dom, dx)
-elif param['method'] == 'rmse_pcpf48+capef47':
-    pcp = open_pcp(48, dom, dx)
-    cape = open_cape(47, dom, dx)
-elif param['method'] == 'rmse_pcpf36+capef33':
-    pcp = open_pcp(36, dom, dx)
-    cape = open_cape(33, dom, dx)
-elif param['method'] == 'rmse_pcpf36+hgt500f00+capef33':
-    pcp = open_pcp(36, dom, dx)
-    cape = open_cape(33, dom, dx)
-    height = open_height(0, dom, dx)
-elif param['method'] == 'rmse_pcpf36+dewptf36':
-    pcp = open_pcp(36, dom, dx)
-    dewpt = open_dewpt(36, dom, dx)
-elif param['method'] == 'rmse_pcpf36+dewptf00+mslpf00':
-    pcp = open_pcp(36, dom, dx)
+elif param['method'] == 'rmse_pcpT00+capeT-3':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    cape = open_cape((param['forecast_hour'] - 3), dom, dx)
+elif param['method'] == 'rmse_pcpT00+dewptT-3':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    dewpt = open_dewpt((param['forecast_hour'] - 3), dom, dx)
+elif param['method'] == 'pcp_area_rmse_pcpT00+dewptT-3':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    dewpt = open_dewpt((param['forecast_hour'] - 3), dom, dx)
+elif param['method'] == 'pcp_area_rmse_pcpT00+dewptT-3+mslpT-3':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    dewpt = open_dewpt((param['forecast_hour'] - 3), dom, dx)
+    mslp = open_mslp((param['forecast_hour'] - 3), dom, dx)
+elif param['method'] == 'pcp_area_rmse_pcpT00+dewptf00+mslpf00':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
     dewpt = open_dewpt(0, dom, dx)
     mslp = open_mslp(0, dom, dx)
-elif param['method'] == 'rmse_pcpf36+dewptf36+mslpf36':
-    pcp = open_pcp(36, dom, dx)
-    dewpt = open_dewpt(36, dom, dx)
-    mslp = open_mslp(36, dom, dx)
-elif param['method'] == 'pcp_area_rmse_pcpf36+dewptf33':
-    pcp = open_pcp(36, dom, dx)
-    dewpt = open_dewpt(33, dom, dx)
+elif param['method'] == 'pcp_area_rmse_pcpT00+temp_2mT00':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    temp = open_temp(param['forecast_hour'], dom, dx)
+elif param['method'] == 'pcp_area_rmse_pcpT00+height_500hPaT00':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    height = open_height(param['forecast_hour'], dom, dx)
+elif param['method'] == 'pcp_area_rmse_pcpT00+hgt500f00+capeT-3':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    height = open_height(0, dom, dx)
+    cape = open_cape((param['forecast_hour'] - 3), dom, dx)
+elif param['method'] == 'rmse_pcpT00+hgt500f00+capeT-3':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    height = open_height(0, dom, dx)
+    cape = open_cape((param['forecast_hour'] - 3), dom, dx)
+elif param['method'] == 'rmse_pcpT00+capeT-1':
+    pcp = open_pcp(param['forecast_hour'], dom, dx)
+    cape = open_cape((param['forecast_hour'] - 1), dom, dx)
+# elif param['method'] == 'rmse_pcpf36+capef33':
+#     pcp = open_pcp(36, dom, dx)
+#     cape = open_cape(33, dom, dx)
+# elif param['method'] == 'rmse_pcpf36+hgt500f00+capef33':
+#     pcp = open_pcp(36, dom, dx)
+#     cape = open_cape(33, dom, dx)
+#     height = open_height(0, dom, dx)
+# elif param['method'] == 'rmse_pcpf36+dewptf36':
+#     pcp = open_pcp(36, dom, dx)
+#     dewpt = open_dewpt(36, dom, dx)
+# elif param['method'] == 'rmse_pcpf36+dewptf00+mslpf00':
+#     pcp = open_pcp(36, dom, dx)
+#     dewpt = open_dewpt(0, dom, dx)
+#     mslp = open_mslp(0, dom, dx)
+# elif param['method'] == 'rmse_pcpf36+dewptf36+mslpf36':
+#     pcp = open_pcp(36, dom, dx)
+#     dewpt = open_dewpt(36, dom, dx)
+#     mslp = open_mslp(36, dom, dx)
+# elif param['method'] == 'pcp_area_rmse_pcpf36+dewptf33':
+#     pcp = open_pcp(36, dom, dx)
+#     dewpt = open_dewpt(33, dom, dx)
 else:
     raise ValueError('Method not defined')
 
@@ -268,48 +269,48 @@ dates = pd.date_range(start=param['an_start_date'],
 
 for date in dates:
     print('Starting date '+str(date), flush=True)
-    if param['method'] == 'rmse_pcp':
+    if param['method'] == 'rmse_pcpT00':
         an_idx = find_analogue(date, pcp)
-    elif param['method'] == 'rmse_pcpf48+dewptf48':
+    elif param['method'] == 'rmse_pcpT00+dewptT00':
         an_idx = find_analogue(date, pcp, dewpt)
-    elif param['method'] == 'rmse_pcpf48+dewptf48+mslpf48':
+    elif param['method'] == 'rmse_pcpT00+dewptT00+mslpT00':
         an_idx = find_analogue(date, pcp, dewpt, mslp)
-    elif param['method'] == 'rmse_pcpf48+dewptf00':
+    elif param['method'] == 'rmse_pcpT00+dewptf00':
         an_idx = find_analogue(date, pcp, dewpt)
-    elif param['method'] == 'rmse_pcpf48+dewptf00+mslpf00':
+    elif param['method'] == 'rmse_pcpT00+dewptf00+mslpf00':
         an_idx = find_analogue(date, pcp, dewpt, mslp)
-    elif param['method'] == 'rmse_pcpf48+capef45':
+    elif param['method'] == 'rmse_pcpT00+capeT-3':
         an_idx = find_analogue(date, pcp, cape)
-    elif param['method'] == 'rmse_pcpf48+capef47':
+    elif param['method'] == 'rmse_pcpT00+capeT-1':
         an_idx = find_analogue(date, pcp, cape)
-    elif param['method'] == 'rmse_pcpf48+dewptf45':
+    elif param['method'] == 'rmse_pcpT00+dewptT-3':
         an_idx = find_analogue(date, pcp, dewpt)
-    elif param['method'] == 'pcp_area_rmse_pcpf48+dewptf45':
+    elif param['method'] == 'pcp_area_rmse_pcpT00+dewptT-3':
         an_idx = find_analogue_precip_area(date, pcp, dewpt)
-    elif param['method'] == 'pcp_area_rmse_pcpf48+dewptf45+mslpf45':
+    elif param['method'] == 'pcp_area_rmse_pcpT00+dewptT-3+mslpT-3':
         an_idx = find_analogue_precip_area(date, pcp, dewpt, mslp)
-    elif param['method'] == 'pcp_area_rmse_pcpf48+dewptf00+mslpf00':
+    elif param['method'] == 'pcp_area_rmse_pcpT00+dewptf00+mslpf00':
         an_idx = find_analogue_precip_area(date, pcp, dewpt, mslp)
-    elif param['method'] == 'pcp_area_rmse_pcpf48+temp_2mf48':
+    elif param['method'] == 'pcp_area_rmse_pcpT00+temp_2mT00':
         an_idx = find_analogue_precip_area(date, pcp, temp)
-    elif param['method'] == 'pcp_area_rmse_pcpf48+height_500hPaf48':
+    elif param['method'] == 'pcp_area_rmse_pcpT00+height_500hPaT00':
         an_idx = find_analogue_precip_area(date, pcp, height)
-    elif param['method'] == 'pcp_area_rmse_pcpf48+hgt500f00+capef45':
+    elif param['method'] == 'pcp_area_rmse_pcpT00+hgt500f00+capeT-3':
         an_idx = find_analogue_precip_area(date, pcp, height, cape)
-    elif param['method'] == 'rmse_pcpf48+hgt500f00+capef45':
+    elif param['method'] == 'rmse_pcpT00+hgt500f00+capeT-3':
         an_idx = find_analogue(date, pcp, height, cape)
-    elif param['method'] == 'rmse_pcpf36+hgt500f00+capef33':
-        an_idx = find_analogue(date, pcp, height, cape)
-    elif param['method'] == 'rmse_pcpf36+capef33':
-        an_idx = find_analogue(date, pcp, cape)
-    elif param['method'] == 'rmse_pcpf36+dewptf36':
-        an_idx = find_analogue(date, pcp, dewpt)
-    elif param['method'] == 'rmse_pcpf36+dewptf00+mslpf00':
-        an_idx = find_analogue(date, pcp, dewpt, mslp)
-    elif param['method'] == 'rmse_pcpf36+dewptf36+mslpf36':
-        an_idx = find_analogue(date, pcp, dewpt, mslp)
-    elif param['method'] == 'pcp_area_rmse_pcpf36+dewptf33':
-        an_idx = find_analogue_precip_area(date, pcp, dewpt)
+    # elif param['method'] == 'rmse_pcpf36+hgt500f00+capef33':
+    #     an_idx = find_analogue(date, pcp, height, cape)
+    # elif param['method'] == 'rmse_pcpf36+capef33':
+    #     an_idx = find_analogue(date, pcp, cape)
+    # elif param['method'] == 'rmse_pcpf36+dewptf36':
+    #     an_idx = find_analogue(date, pcp, dewpt)
+    # elif param['method'] == 'rmse_pcpf36+dewptf00+mslpf00':
+    #     an_idx = find_analogue(date, pcp, dewpt, mslp)
+    # elif param['method'] == 'rmse_pcpf36+dewptf36+mslpf36':
+    #     an_idx = find_analogue(date, pcp, dewpt, mslp)
+    # elif param['method'] == 'pcp_area_rmse_pcpf36+dewptf33':
+    #     an_idx = find_analogue_precip_area(date, pcp, dewpt)
     else:
         raise ValueError('Method not defined')
 
@@ -403,7 +404,7 @@ for date in dates:
                                   st4_verif.where(mem_smooth >= verif_param['threshold']))
             rmse_mem = (rmse_from_fcst + rmse_from_obs) / 2.
             verif_pbl.append(rmse_mem)
-        verif_members_pbl = np.array(verif_mp)
+        verif_members_pbl = np.array(verif_pbl)
 
         # Sort members by performance
         sorted_pbl = np.array(pbl_list)[np.argsort(verif_members_pbl)]
@@ -474,11 +475,11 @@ ax2.set_xticks(ticks)
 plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_ranks.png')
 
 # Find average best member
-print('Finding Best Member', flush=True)
 tot_rmse = verify_members(pcp, stage4.total_precipitation, verif_param, mem_list)
-
-mean_best_mp = mp_list[np.array([tot_rmse[mem]] for mem in mp_list).argmin()]
-mean_best_pbl = pbl_list[np.array([tot_rmse[mem]] for mem in pbl_list).argmin()]
+mean_mp = np.array([tot_rmse[mem] for mem in mp_list])
+mean_best_mp = mp_list[mean_mp.argmin()]
+mean_pbl = np.array([tot_rmse[mem] for mem in pbl_list])
+mean_best_pbl = pbl_list[mean_pbl.argmin()]
 
 # Compare analogue physics with average best physics
 print('Generating Timeseries', flush=True)
