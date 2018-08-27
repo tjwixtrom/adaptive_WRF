@@ -66,21 +66,25 @@ def test_verif_members():
         'forecast_hour': 0,
         'threshold': 10,
         'sigma': 2,
-        'start_date': '2015-12-28T12:00:00',
+        'start_date': '2015-12-27T12:00:00',
         'end_date': '2015-12-29T12:00:00',
         'dt': '1D'
         }
     date_array = pd.date_range(start=param['start_date'],
                                end=param['end_date'],
                                freq=param['dt'])
-    data = np.ones((2, 5, 5)) * np.linspace(5, 30, 50).reshape(2, 5, 5)
+    data = np.ones((3, 5, 5)) * np.linspace(0, 30, 75).reshape(3, 5, 5)
+    data[1, ] = 0.
+    mem1_data = data * 10.
+    mem3_data = data * 5.
     lat = np.linspace(40, 45, 5)
     lon = np.linspace(-105, -100, 5)
     mlon, mlat = np.meshgrid(lon, lat)
-    mem_list = ['mem1', 'mem2']
-    dataset = xr.Dataset({'mem1': (['time', 'latitude', 'longitude'], data * 2.),
+    mem_list = ['mem1', 'mem2', 'mem3', 'mem4']
+    dataset = xr.Dataset({'mem1': (['time', 'latitude', 'longitude'], mem1_data),
                           'mem2': (['time', 'latitude', 'longitude'], data),
-                          'mem3': (['time', 'latitude', 'longitude'], data * 1.5),
+                          'mem3': (['time', 'latitude', 'longitude'], mem3_data),
+                          'mem4': (['time', 'latitude', 'longitude'], data * 15.),
                           'mean': (['time', 'latitude', 'longitude'], data * 0.5)},
                          coords={'time': date_array,
                                  'lat': (['latitude', 'longitude'], mlat),
@@ -91,7 +95,7 @@ def test_verif_members():
                              'lon': (['latitude', 'longitude'], mlon)})
     tot_rmse = verify_members(dataset, obs.total_precipitation, param, mem_list)
     members = np.array([tot_rmse[mem] for mem in mem_list])
-    best_mem = members.argmin()
+    best_mem = np.nanargmin(members)
     assert_almost_equal(best_mem, 1, 4)
 
 

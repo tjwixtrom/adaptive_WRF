@@ -60,8 +60,7 @@ param = {
     'an_start_date': '2015-10-01T12:00:00',
     'an_end_date': '2015-12-29T12:00:00',
     'dt': '1D',
-    'comments': 'Calculate analogues for outer domain, now includes all PBL members (YSU'
-                'previously excluded)'
+    'comments': 'Calculate analogues for outer domain after fixing verification error'
     }
 
 verif_param = {
@@ -477,9 +476,10 @@ plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_ranks.png')
 # Find average best member
 tot_rmse = verify_members(pcp, stage4.total_precipitation, verif_param, mem_list)
 mean_mp = np.array([tot_rmse[mem] for mem in mp_list])
-mean_best_mp = mp_list[mean_mp.argmin()]
+print(tot_rmse, flush=True)
+mean_best_mp = mp_list[np.nanargmin(mean_mp)]
 mean_pbl = np.array([tot_rmse[mem] for mem in pbl_list])
-mean_best_pbl = pbl_list[mean_pbl.argmin()]
+mean_best_pbl = pbl_list[np.nanargmin(mean_pbl)]
 
 # Compare analogue physics with average best physics
 print('Generating Timeseries', flush=True)

@@ -6,7 +6,7 @@
 #$ -q ancellcc
 #$ -pe sm 32
 #$ -P communitycluster
-#$ -t 1-14:1
+#$ -t 2-14:1
 
 ##############################################################################################
 # Array job script for testing multiple thresholds/methods on both the inner and outer
