@@ -6,7 +6,7 @@
 #$ -q ancellcc
 #$ -pe sm 32
 #$ -P communitycluster
-#$ -t 2-14:1
+#$ -t 1-14:1
 
 ##############################################################################################
 # Array job script for testing multiple thresholds/methods on both the inner and outer
@@ -46,7 +46,7 @@ methods=(
         "rmse_pcpT00+hgt500f00+capeT-3"
         )
 method=${methods[${ID}]}
-save_dir=/lustre/work/twixtrom/analogue_analysis_rename/f${an_fhour}/domain${domain}/${method}/
+save_dir=/lustre/work/twixtrom/analogue_analysis_grid_rmse/f${an_fhour}/domain${domain}/${method}/
 mkdir -p ${save_dir}
 python_exec=/home/twixtrom/miniconda3/envs/research/bin/python
 runscript=/home/twixtrom/analogue_algorithm/calc_analogue.py

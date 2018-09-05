@@ -476,7 +476,6 @@ plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_ranks.png')
 # Find average best member
 tot_rmse = verify_members(pcp, stage4.total_precipitation, verif_param, mem_list)
 mean_mp = np.array([tot_rmse[mem] for mem in mp_list])
-print(tot_rmse, flush=True)
 mean_best_mp = mp_list[np.nanargmin(mean_mp)]
 mean_pbl = np.array([tot_rmse[mem] for mem in pbl_list])
 mean_best_pbl = pbl_list[np.nanargmin(mean_pbl)]
@@ -495,35 +494,12 @@ for i in range(len(an_dates)):
         date = an_dates[i]
         st4_date = date + pd.Timedelta(hours=param['forecast_hour'])
 
-        # Smooth and mask observed precip
-        st4_smooth = gaussian_filter(stage4[
-                                            'total_precipitation'
-                                            ].sel(
-                                                  time=st4_date,
-                                                  drop=True
-                                                  ), param['sigma'])
-        st4_verif = stage4[
-                            'total_precipitation'
-                            ].sel(
-                                  time=st4_date,
-                                  drop=True
-                                  )
-
-        # get analogue precip and best precip
+        # Calculate change in RMSE with grid-based verification
+        st4 = stage4['total_precipitation'].sel(time=st4_date, drop=True)
         an_pcp = pcp[an_pbl_mem[i]].sel(time=date, drop=True)
         best_pcp = pcp[mean_best_pbl].sel(time=date, drop=True)
-        an_rmse_from_obs = rmse(an_pcp.where(st4_smooth >= verif_param['threshold']),
-                                st4_verif.where(st4_smooth >= verif_param['threshold']))
-        best_rmse_from_obs = rmse(best_pcp.where(st4_smooth >= verif_param['threshold']),
-                                  st4_verif.where(st4_smooth >= verif_param['threshold']))
-        fcst_smooth = gaussian_filter(pcp['mean'].sel(time=date, drop=True),
-                                      verif_param['sigma'])
-        an_rmse_from_fcst = rmse(an_pcp.where(fcst_smooth >= verif_param['threshold']),
-                                 st4_verif.where(fcst_smooth >= verif_param['threshold']))
-        best_rmse_from_fcst = rmse(best_pcp.where(fcst_smooth >= verif_param['threshold']),
-                                   st4_verif.where(fcst_smooth >= verif_param['threshold']))
-        rmse_an_pbl.append((an_rmse_from_fcst + an_rmse_from_obs) / 2.)
-        rmse_best_pbl.append((best_rmse_from_fcst + best_rmse_from_obs) / 2.)
+        rmse_an_pbl.append(rmse(an_pcp, st4))
+        rmse_best_pbl.append(rmse(best_pcp, st4))
 
 
 # For MP Members
@@ -538,30 +514,13 @@ for i in range(len(an_dates)):
         date = an_dates[i]
         st4_date = date + pd.Timedelta(hours=param['forecast_hour'])
 
-        # Smooth and mask observed precip
-        st4_smooth = gaussian_filter(stage4[
-                                            'total_precipitation'
-                                            ].sel(
-                                                  time=st4_date,
-                                                  drop=True
-                                                  ), param['sigma'])
-        st4_verif = stage4['total_precipitation'].sel(time=st4_date, drop=True)
-
-        # get analogue precip and MYNN precip
+        # Calculate change in RMSE with grid-based verification
+        st4 = stage4['total_precipitation'].sel(time=st4_date, drop=True)
         an_pcp = pcp[an_mp_mem[i]].sel(time=date, drop=True)
         best_pcp = pcp[mean_best_mp].sel(time=date, drop=True)
-        an_rmse_from_obs = rmse(an_pcp.where(st4_smooth >= verif_param['threshold']),
-                                st4_verif.where(st4_smooth >= verif_param['threshold']))
-        best_rmse_from_obs = rmse(best_pcp.where(st4_smooth >= verif_param['threshold']),
-                                  st4_verif.where(st4_smooth >= verif_param['threshold']))
-        fcst_smooth = gaussian_filter(pcp['mean'].sel(time=date, drop=True),
-                                      verif_param['sigma'])
-        an_rmse_from_fcst = rmse(an_pcp.where(fcst_smooth >= verif_param['threshold']),
-                                 st4_verif.where(fcst_smooth >= verif_param['threshold']))
-        best_rmse_from_fcst = rmse(best_pcp.where(fcst_smooth >= verif_param['threshold']),
-                                   st4_verif.where(fcst_smooth >= verif_param['threshold']))
-        rmse_an_mp.append((an_rmse_from_fcst + an_rmse_from_obs) / 2.)
-        rmse_best_mp.append((best_rmse_from_fcst + best_rmse_from_obs) / 2.)
+        rmse_an_mp.append(rmse(an_pcp, st4))
+        rmse_best_mp.append(rmse(best_pcp, st4))
+
 diff_rmse_mp = np.array(rmse_an_mp) - np.array(rmse_best_mp)
 diff_rmse_pbl = np.array(rmse_an_pbl) - np.array(rmse_best_pbl)
 

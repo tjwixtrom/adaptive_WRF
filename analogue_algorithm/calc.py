@@ -131,6 +131,39 @@ def find_analogue(forecast_date, *args):
 #             tot_rmse[mem] = mem_rmse + error
 #     return tot_rmse
 
+# def verify_members(dataset, observations, parameters, mem_list):
+#     """
+#     Calculates the sum of RMSE for each dataset member over the specified time range
+#
+#     :param dataset: xarray dataset. Input forecast dataset
+#     :param observations: xarray dataset. Observations dataset
+#     :param parameters: dict. Dictionary of parameter values as below
+#               forecast_hour: float. Valid forecast hour of forecast dataset
+#               threshold: float. Threshold for verification masking
+#               sigma: float. Standard deviation of guassian filter
+#               start_date: str. Start date of verification period
+#               end_date: str. End date of verification period
+#     :param mem_list: List of string member names
+#     :return: Sum of RMSE for each member over verification period
+#     """
+#     tot_rmse = {}
+#     dates = pd.date_range(start=parameters['start_date'],
+#                           end=parameters['end_date'],
+#                           freq=parameters['dt'])
+#     for mem in mem_list:
+#         mem_rmse = 0.
+#         for date in dates:
+#             obs_date = date + pd.Timedelta(hours=parameters['forecast_hour'])
+#             obs_data = observations.sel(time=obs_date)
+#             mem_data = dataset[mem].sel(time=date)
+#             error = rmse(mem_data.values, obs_data.values, nan=True)
+#             if np.isnan(error):
+#                 error = 0.
+#             mem_rmse += error
+#         tot_rmse[mem] = mem_rmse
+#     return tot_rmse
+
+
 def verify_members(dataset, observations, parameters, mem_list):
     """
     Calculates the sum of RMSE for each dataset member over the specified time range
@@ -147,22 +180,16 @@ def verify_members(dataset, observations, parameters, mem_list):
     :return: Sum of RMSE for each member over verification period
     """
     tot_rmse = {}
-    for mem in mem_list:
-        tot_rmse[mem] = 0.
+    fcst_dates = pd.date_range(start=parameters['start_date'],
+                               end=parameters['end_date'],
+                               freq=parameters['dt'])
 
-    dates = pd.date_range(start=parameters['start_date'],
-                          end=parameters['end_date'],
-                          freq=parameters['dt'])
-    for date in dates:
-        obs_date = date + pd.Timedelta(hours=parameters['forecast_hour'])
-        obs_data = observations.sel(time=obs_date)
-        for mem in mem_list:
-            mem_rmse = tot_rmse[mem]
-            mem_data = dataset[mem].sel(time=date)
-            error = rmse(mem_data.values, obs_data.values)
-            if np.isnan(error):
-                error = 0.
-            tot_rmse[mem] = mem_rmse + error
+    pcp_sum = dataset.sel(time=fcst_dates).sum(dim=['time'])
+    obs_dates = fcst_dates + pd.Timedelta(float(parameters['forecast_hour']),
+                                          parameters['dt'])
+    obs_sum = observations.sel(time=obs_dates).sum(dim=['time'])
+    for mem in mem_list:
+        tot_rmse[mem] = rmse(pcp_sum, obs_sum)
     return tot_rmse
 
 
