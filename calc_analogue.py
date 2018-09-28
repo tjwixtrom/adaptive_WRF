@@ -60,7 +60,8 @@ param = {
     'an_start_date': '2015-10-01T12:00:00',
     'an_end_date': '2015-12-29T12:00:00',
     'dt': '1D',
-    'comments': 'Calculate analogues for outer domain after fixing verification error'
+    'comments': 'Calculate analogues for outer domain with verification based on '
+                'RMSE over points with precip in either forecast or observed'
     }
 
 verif_param = {
@@ -321,16 +322,20 @@ for date in dates:
         # Get the analogue's verification
         fcst_smooth = gaussian_filter(pcp['mean'].sel(time=date), pcp.attrs['sigma'])
         analogue_time = pcp.time.isel(time=an_idx) + pd.Timedelta(hours=param['forecast_hour'])
-        st4_an = stage4.total_precipitation.sel(
+        obs = stage4.total_precipitation.sel(
             time=analogue_time,
             drop=True
-            ).where(fcst_smooth >= param['pcp_threshold'])
+            )
+        obs_smooth = gaussian_filter(obs, param['sigma'])
+        st4_an = obs.where((obs_smooth >= param['pcp_threshold']) |
+                           (fcst_smooth >= param['pcp_threshold']))
 
         # Find best member for analouge date by RMSE
         # for MP members
         an_rmse_mp = []
         for mem in mp_list:
-            mem_data = pcp[mem][an_idx, ].where(fcst_smooth >= param['pcp_threshold'])
+            mem_data = pcp[mem][an_idx, ].where((fcst_smooth >= param['pcp_threshold']) |
+                                                (obs_smooth >= param['pcp_threshold']))
             rmse_mem = rmse(mem_data, st4_an)
             an_rmse_mp.append(rmse_mem)
         an_mp = np.array(an_rmse_mp)
@@ -338,7 +343,8 @@ for date in dates:
         # for PBL members
         an_rmse_pbl = []
         for mem in pbl_list:
-            mem_data = pcp[mem][an_idx, ].where(fcst_smooth >= param['pcp_threshold'])
+            mem_data = pcp[mem][an_idx, ].where((fcst_smooth >= param['pcp_threshold']) |
+                                                (obs_smooth >= param['pcp_threshold']))
             rmse_mem = rmse(mem_data, st4_an)
             an_rmse_pbl.append(rmse_mem)
         an_pbl = np.array(an_rmse_pbl)
@@ -371,13 +377,12 @@ for date in dates:
                 time=date,
                 drop=True
                 )
-            rmse_from_obs = rmse(mem_data.where(st4_smooth >= verif_param['threshold']),
-                                 st4_verif.where(st4_smooth >= verif_param['threshold']))
             mem_smooth = gaussian_filter(mem_data, verif_param['sigma'])
-            rmse_from_fcst = rmse(mem_data.where(mem_smooth >= verif_param['threshold']),
-                                  st4_verif.where(mem_smooth >= verif_param['threshold']))
-            rmse_mem = (rmse_from_fcst + rmse_from_obs) / 2.
-            verif_mp.append(rmse_mem)
+            error = rmse(mem_data.where((st4_smooth >= verif_param['threshold']) |
+                                        (mem_smooth >= verif_param['threshold'])),
+                         st4_verif.where((st4_smooth >= verif_param['threshold']) |
+                                         (mem_smooth >= verif_param['threshold'])))
+            verif_mp.append(error)
         verif_members_mp = np.array(verif_mp)
 
         # Sort members by performance
@@ -395,14 +400,14 @@ for date in dates:
         for mem in pbl_list:
             mem_data = pcp[mem].sel(
                 time=date,
-                drop=True)
-            rmse_from_obs = rmse(mem_data.where(st4_smooth >= verif_param['threshold']),
-                                 st4_verif.where(st4_smooth >= verif_param['threshold']))
+                drop=True
+                )
             mem_smooth = gaussian_filter(mem_data, verif_param['sigma'])
-            rmse_from_fcst = rmse(mem_data.where(mem_smooth >= verif_param['threshold']),
-                                  st4_verif.where(mem_smooth >= verif_param['threshold']))
-            rmse_mem = (rmse_from_fcst + rmse_from_obs) / 2.
-            verif_pbl.append(rmse_mem)
+            error = rmse(mem_data.where(((st4_smooth >= verif_param['threshold']) |
+                                         (mem_smooth >= verif_param['threshold']))),
+                         st4_verif.where(((st4_smooth >= verif_param['threshold']) |
+                                          (mem_smooth >= verif_param['threshold']))))
+            verif_pbl.append(error)
         verif_members_pbl = np.array(verif_pbl)
 
         # Sort members by performance
@@ -494,12 +499,23 @@ for i in range(len(an_dates)):
         date = an_dates[i]
         st4_date = date + pd.Timedelta(hours=param['forecast_hour'])
 
-        # Calculate change in RMSE with grid-based verification
+        # Calculate change in RMSE with point-based verification
         st4 = stage4['total_precipitation'].sel(time=st4_date, drop=True)
+        st4_smooth = gaussian_filter(st4, verif_param['sigma'])
         an_pcp = pcp[an_pbl_mem[i]].sel(time=date, drop=True)
+        an_smooth = gaussian_filter(an_pcp, verif_param['sigma'])
         best_pcp = pcp[mean_best_pbl].sel(time=date, drop=True)
-        rmse_an_pbl.append(rmse(an_pcp, st4))
-        rmse_best_pbl.append(rmse(best_pcp, st4))
+        best_smooth = gaussian_filter(best_pcp, verif_param['sigma'])
+        error_an = rmse(an_pcp.where(((st4_smooth >= verif_param['threshold']) |
+                                      (an_smooth >= verif_param['threshold']))),
+                        st4.where(((st4_smooth >= verif_param['threshold']) |
+                                   (an_smooth >= verif_param['threshold']))))
+        rmse_an_pbl.append(error_an)
+        error_best = rmse(best_pcp.where(((st4_smooth >= verif_param['threshold']) |
+                                          (best_smooth >= verif_param['threshold']))),
+                          st4.where(((st4_smooth >= verif_param['threshold']) |
+                                     (best_smooth >= verif_param['threshold']))))
+        rmse_best_pbl.append(error_best)
 
 
 # For MP Members
@@ -514,12 +530,23 @@ for i in range(len(an_dates)):
         date = an_dates[i]
         st4_date = date + pd.Timedelta(hours=param['forecast_hour'])
 
-        # Calculate change in RMSE with grid-based verification
+        # Calculate change in RMSE with point-based verification
         st4 = stage4['total_precipitation'].sel(time=st4_date, drop=True)
+        st4_smooth = gaussian_filter(st4, verif_param['sigma'])
         an_pcp = pcp[an_mp_mem[i]].sel(time=date, drop=True)
+        an_smooth = gaussian_filter(an_pcp, verif_param['sigma'])
         best_pcp = pcp[mean_best_mp].sel(time=date, drop=True)
-        rmse_an_mp.append(rmse(an_pcp, st4))
-        rmse_best_mp.append(rmse(best_pcp, st4))
+        best_smooth = gaussian_filter(best_pcp, verif_param['sigma'])
+        error_an = rmse(an_pcp.where(((st4_smooth >= verif_param['threshold']) |
+                                      (an_smooth >= verif_param['threshold']))),
+                        st4.where(((st4_smooth >= verif_param['threshold']) |
+                                   (an_smooth >= verif_param['threshold']))))
+        rmse_an_mp.append(error_an)
+        error_best = rmse(best_pcp.where(((st4_smooth >= verif_param['threshold']) |
+                                          (best_smooth >= verif_param['threshold']))),
+                          st4.where(((st4_smooth >= verif_param['threshold']) |
+                                     (best_smooth >= verif_param['threshold']))))
+        rmse_best_mp.append(error_best)
 
 diff_rmse_mp = np.array(rmse_an_mp) - np.array(rmse_best_mp)
 diff_rmse_pbl = np.array(rmse_an_pbl) - np.array(rmse_best_pbl)

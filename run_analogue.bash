@@ -46,7 +46,7 @@ methods=(
         "rmse_pcpT00+hgt500f00+capeT-3"
         )
 method=${methods[${ID}]}
-save_dir=/lustre/work/twixtrom/analogue_analysis_grid_rmse/f${an_fhour}/domain${domain}/${method}/
+save_dir=/lustre/work/twixtrom/analogue_analysis_fcst+obs_points_rmse/f${an_fhour}/domain${domain}/${method}/
 mkdir -p ${save_dir}
 python_exec=/home/twixtrom/miniconda3/envs/research/bin/python
 runscript=/home/twixtrom/analogue_algorithm/calc_analogue.py
