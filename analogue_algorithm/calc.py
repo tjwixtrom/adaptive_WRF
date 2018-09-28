@@ -95,6 +95,9 @@ def verify_members(dataset, observations, parameters, mem_list):
               end_date: str. End date of verification period
     :param mem_list: List of string member names
     :return: Sum of RMSE for each member over verification period
+
+    Note: Calculation is performed for points with precipitation observed in either
+          forecast or observed dataset.
     """
     tot_rmse = {}
     for mem in mem_list:
@@ -109,21 +112,52 @@ def verify_members(dataset, observations, parameters, mem_list):
         obs_smooth = gaussian_filter(obs_data, parameters['sigma'])
         for mem in mem_list:
             mem_rmse = tot_rmse[mem]
-            mem_data = dataset[mem].sel(time=date).where(obs_smooth >= parameters['threshold'])
-            rmse_from_obs = rmse(mem_data.values,
-                                 obs_data.where(obs_smooth >= parameters['threshold']).values)
             fcst_smooth = gaussian_filter(dataset[mem].sel(time=date),
                                           parameters['sigma'])
             mem_data = dataset[mem].sel(
-                time=date
-                ).where(fcst_smooth >= parameters['threshold'])
-            rmse_from_fcst = rmse(mem_data.values, obs_data.where(
-                                    fcst_smooth >= parameters['threshold']).values)
-            mean_rmse = (rmse_from_fcst + rmse_from_obs) / 2.
-            if np.isnan(mean_rmse):
-                tot_rmse[mem] = mem_rmse
-            else:
-                tot_rmse[mem] = mem_rmse + mean_rmse
+                                        time=date
+                                        ).where(
+                                        ((obs_smooth >= parameters['threshold']) |
+                                         (fcst_smooth >= parameters['threshold']))
+                                        )
+            obs_data_points = obs_data.where(
+                           ((obs_smooth >= parameters['threshold']).any() or
+                            (fcst_smooth >= parameters['threshold']).any()))
+            error = rmse(mem_data.values, obs_data_points.values)
+            if np.isnan(error):
+                error = 0.
+            tot_rmse[mem] = mem_rmse + error
+    return tot_rmse
+
+
+def verify_members_grid(dataset, observations, parameters, mem_list):
+    """
+    Calculates the sum of RMSE for each dataset member over the specified time range
+
+    :param dataset: xarray dataset. Input forecast dataset
+    :param observations: xarray dataset. Observations dataset
+    :param parameters: dict. Dictionary of parameter values as below
+              forecast_hour: float. Valid forecast hour of forecast dataset
+              threshold: float. Threshold for verification masking
+              sigma: float. Standard deviation of guassian filter
+              start_date: str. Start date of verification period
+              end_date: str. End date of verification period
+    :param mem_list: List of string member names
+    :return: Sum of RMSE for each member over verification period
+
+    Note: Calculation is performed for entire grid
+    """
+    tot_rmse = {}
+    fcst_dates = pd.date_range(start=parameters['start_date'],
+                               end=parameters['end_date'],
+                               freq=parameters['dt'])
+
+    pcp_sum = dataset.sel(time=fcst_dates).sum(dim=['time'])
+    obs_dates = fcst_dates + pd.Timedelta(float(parameters['forecast_hour']),
+                                          parameters['dt'])
+    obs_sum = observations.sel(time=obs_dates).sum(dim=['time'])
+    for mem in mem_list:
+        tot_rmse[mem] = rmse(pcp_sum, obs_sum)
     return tot_rmse
 
 
