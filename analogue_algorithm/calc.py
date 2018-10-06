@@ -121,8 +121,8 @@ def verify_members(dataset, observations, parameters, mem_list):
                                          (fcst_smooth >= parameters['threshold']))
                                         )
             obs_data_points = obs_data.where(
-                           ((obs_smooth >= parameters['threshold']).any() or
-                            (fcst_smooth >= parameters['threshold']).any()))
+                           ((obs_smooth >= parameters['threshold']) |
+                            (fcst_smooth >= parameters['threshold'])))
             error = rmse(mem_data.values, obs_data_points.values)
             if np.isnan(error):
                 error = 0.

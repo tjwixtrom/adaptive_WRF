@@ -43,29 +43,28 @@ param = {
     'sigma': 2.,
     'directory': sys.argv[3],
     'method': sys.argv[2],
-    'forecast_hour': 48,
-    'pcp_threshold': 10.,
+    'forecast_hour': float(sys.argv[4]),
+    'pcp_threshold': float(sys.argv[5]),
     'pcp_operator': operator.ge,
-    'dewpt_threshold': 20.,
+    'dewpt_threshold': float(sys.argv[7]),
     'dewpt_operator': operator.ge,
-    'mslp_threshold': 1020.,
+    'mslp_threshold': float(sys.argv[9]),
     'mslp_operator': operator.le,
-    'cape_threshold': 50.,
+    'cape_threshold': float(sys.argv[6]),
     'cape_operator': operator.ge,
     'temp_2m_threshold': None,
     'temp_2m_operator': None,
-    'height_500hPa_threshold': 5700,
+    'height_500hPa_threshold': float(sys.argv[8]),
     'height_500hPa_operator': operator.le,
     'start_date': '2015-01-01T12:00:00',
     'an_start_date': '2015-10-01T12:00:00',
     'an_end_date': '2015-12-29T12:00:00',
     'dt': '1D',
-    'comments': 'Calculate analogues for outer domain with verification based on '
-                'RMSE over points with precip in either forecast or observed'
+    'comments': 'Method testing for mslp threshold sensitivity'
     }
 
 verif_param = {
-    'forecast_hour': 48,
+    'forecast_hour': float(sys.argv[4]),
     'threshold': 10.,
     'sigma': 2,
     'start_date': '2015-01-01T12:00:00',
@@ -229,27 +228,6 @@ elif param['method'] == 'rmse_pcpT00+hgt500f00+capeT-3':
 elif param['method'] == 'rmse_pcpT00+capeT-1':
     pcp = open_pcp(param['forecast_hour'], dom, dx)
     cape = open_cape((param['forecast_hour'] - 1), dom, dx)
-# elif param['method'] == 'rmse_pcpf36+capef33':
-#     pcp = open_pcp(36, dom, dx)
-#     cape = open_cape(33, dom, dx)
-# elif param['method'] == 'rmse_pcpf36+hgt500f00+capef33':
-#     pcp = open_pcp(36, dom, dx)
-#     cape = open_cape(33, dom, dx)
-#     height = open_height(0, dom, dx)
-# elif param['method'] == 'rmse_pcpf36+dewptf36':
-#     pcp = open_pcp(36, dom, dx)
-#     dewpt = open_dewpt(36, dom, dx)
-# elif param['method'] == 'rmse_pcpf36+dewptf00+mslpf00':
-#     pcp = open_pcp(36, dom, dx)
-#     dewpt = open_dewpt(0, dom, dx)
-#     mslp = open_mslp(0, dom, dx)
-# elif param['method'] == 'rmse_pcpf36+dewptf36+mslpf36':
-#     pcp = open_pcp(36, dom, dx)
-#     dewpt = open_dewpt(36, dom, dx)
-#     mslp = open_mslp(36, dom, dx)
-# elif param['method'] == 'pcp_area_rmse_pcpf36+dewptf33':
-#     pcp = open_pcp(36, dom, dx)
-#     dewpt = open_dewpt(33, dom, dx)
 else:
     raise ValueError('Method not defined')
 
@@ -484,6 +462,8 @@ mean_mp = np.array([tot_rmse[mem] for mem in mp_list])
 mean_best_mp = mp_list[np.nanargmin(mean_mp)]
 mean_pbl = np.array([tot_rmse[mem] for mem in pbl_list])
 mean_best_pbl = pbl_list[np.nanargmin(mean_pbl)]
+# mean_best_mp = 'mem1'
+# mean_best_pbl = 'mem1'
 
 # Compare analogue physics with average best physics
 print('Generating Timeseries', flush=True)
