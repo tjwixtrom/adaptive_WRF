@@ -4,9 +4,9 @@
 #$ -S /bin/bash
 #$ -N analogue
 #$ -q ancellcc
-#$ -pe sm 32
+#$ -pe sm 1
 #$ -P communitycluster
-#$ -t 1-14:1
+#$ -t 1-13:1
 
 ##############################################################################################
 # Array job script for testing multiple thresholds/methods on both the inner and outer
@@ -28,7 +28,13 @@ ID=$(( $SGE_TASK_ID - 1 ))
 #
 #thresh=${thresholds[${thresh_idx}]}
 #stdev=${stdevs[${stdevs_idx}]}
-an_fhour=48
+# mslp_thresholds=( 995 1000 1005 1010 1015 1020 1025 )
+mslp_threshold=1005
+dewpt_threshold=20
+cape_threshold=1000
+pcp_threshold=10
+height_threshold=5700
+an_fhour=$1
 methods=(
         "rmse_pcpT00"
         "rmse_pcpT00+dewptT00"
@@ -40,14 +46,15 @@ methods=(
         "pcp_area_rmse_pcpT00+dewptT-3"
         "pcp_area_rmse_pcpT00+dewptT-3+mslpT-3"
         "pcp_area_rmse_pcpT00+dewptf00+mslpf00"
-        "pcp_area_rmse_pcpT00+temp_2mT00"
+        # "pcp_area_rmse_pcpT00+temp_2mT00"
         "pcp_area_rmse_pcpT00+height_500hPaT00"
         "pcp_area_rmse_pcpT00+hgt500f00+capeT-3"
         "rmse_pcpT00+hgt500f00+capeT-3"
         )
 method=${methods[${ID}]}
-save_dir=/lustre/work/twixtrom/analogue_analysis_fcst+obs_points_rmse/f${an_fhour}/domain${domain}/${method}/
+# method="rmse_pcpT00+dewptT00+mslpT00"
+save_dir=/lustre/work/twixtrom/analogue_analysis_final/f${an_fhour}/domain${domain}/${method}/${mslp_threshold}/
 mkdir -p ${save_dir}
 python_exec=/home/twixtrom/miniconda3/envs/research/bin/python
 runscript=/home/twixtrom/analogue_algorithm/calc_analogue.py
-${python_exec} ${runscript} ${domain} ${method} ${save_dir}
+${python_exec} ${runscript} ${domain} ${method} ${save_dir} ${an_fhour} ${pcp_threshold} ${cape_threshold} ${dewpt_threshold} ${height_threshold} ${mslp_threshold}
