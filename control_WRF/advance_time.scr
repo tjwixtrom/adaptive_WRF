@@ -1,0 +1,85 @@
+#! /bin/bash
+##################################################################
+#
+#  advance_time.scr - script that advances a date string with 
+#                     format yyyymmddhh forward in time an 
+#                     arbitrary number of hours
+#
+#     $1 - input date in yyyymmddhh format
+#     $2 - number of hours to advance forward
+#
+#     created June 2003, Ryan Torn, U. Washington
+#
+##################################################################
+
+st_dt=$1
+let year_start=${st_dt:0:4}
+mst=${st_dt:4:2}
+dst=${st_dt:6:2}
+hst=${st_dt:8:2}
+
+if [ $mst -eq '08' ] || [ $mst -eq '09' ]; then
+   let month_start=${mst:1:1}
+else
+   let month_start=$mst
+fi
+
+if [ $dst -eq '08' ] || [ $dst -eq '09' ]; then
+   let day_start=${dst:1:1}
+else
+   let day_start=$dst
+fi
+
+if [ $hst -eq '08' ] || [ $hst -eq '09' ]; then
+   let hour_start=${hst:1:1}
+else
+   let hour_start=$hst
+fi
+
+case "$month_start" in
+   1 | 3 | 5 | 7 | 8 | 10 | 12) let max_day=31 ;;
+   4 | 6 | 9 | 11             ) let max_day=30 ;;
+   2                          ) let max_day=28 ;;
+esac
+
+let mody4='year_start%4'
+let mody100='year_start%100'
+let mody400='year_start%400'
+if [ $month_start -eq 2 ] && [ $mody4 -eq 0 ]; then
+  if [ $mody100 == 0 ] && [ $mody400 != 0 ]; then 
+    let max_day=28
+  else
+    let max_day=29
+  fi 
+fi
+
+let hradd=$2
+let hour_fin='hour_start+hradd'
+
+if [ $hour_fin -gt 23 ]; then
+   let day_add='hour_fin / 24'
+   let hour_fin='hour_fin % 24'
+else
+   day_sub=0
+fi
+
+let day_fin='day_start+day_add'
+if [ $day_fin -gt $max_day ]; then
+   let month_fin='month_start+1'
+   if [ $month_fin -gt 12 ]; then
+      let year_fin='year_start+1'
+      let month_fin=1
+   else
+      let year_fin=$year_start
+   fi
+   let day_fin='day_fin-max_day'
+else
+   month_fin=$month_start
+   year_fin=$year_start
+fi
+
+if [ $month_fin -lt 10 ]; then month_fin='0'$month_fin; fi
+if [ $day_fin -lt 10 ]; then day_fin='0'$day_fin; fi
+if [ $hour_fin -lt 10 ]; then hour_fin='0'$hour_fin; fi
+
+echo $year_fin$month_fin$day_fin$hour_fin
