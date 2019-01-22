@@ -8,14 +8,14 @@
 rootdir=/home/twixtrom/adaptive_WRF     # System root directory
 scriptsdir=/home/twixtrom/adaptive_WRF/control_WRF    # Scripts directory
 wrfdir=/lustre/work/twixtrom  # WRF core root directory
-dir_run=/lustre/scratch/twixtrom/adaptive_WRF_run/control_thompson_run
+dir_run=/lustre/scratch/twixtrom/adaptive_wrf_run/control_thompson_run
 dir_compressed_gfs=/lustre/scratch/twixtrom/gfs_compress_201605
 
 #  Domain-Specific Parameters
 #*************************************************
 
 csys=1                      # 1 for quanah, 2 for ancellcc
-norm_cores=72               # cores per run normal
+norm_cores=36               # cores per run normal
 cc_cores=32                 # cores per run ancellcc
 
 let model_Nx1=508           # number of grid points in x-direction

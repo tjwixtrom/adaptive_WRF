@@ -5,8 +5,8 @@
 #$ -N run_thompson
 #$ -P quanah
 #$ -q omni
-#$ -pe mpi 72
-#$ -l h_rt=08:00:00
+#$ -pe sm 36
+#$ -l h_rt=10:00:00
 #$ -t 1-2:1
 
 #############################################################
@@ -51,14 +51,14 @@ ${dir_scripts}/make_namelist_wrf.scr $param $datem
 cd ${dir_run}/${datem}/
 rm ${dir_run}/${datem}/wrfout*
 
- mpirun -np $norm_cores -machinefile ${dir_sub}/machinefile.${JOB_ID} ${dir_run}/${datem}/real.exe
-#mpirun -np $norm_cores ${dir_run}/${datem}/real.exe
+# mpirun -np $norm_cores -machinefile ${dir_sub}/machinefile.${JOB_ID} ${dir_run}/${datem}/real.exe
+mpirun -np $norm_cores ${dir_run}/${datem}/real.exe
 
 cat ${dir_run}/${datem}/rsl* > ${dir_store}/${datem}/rslout_real_${datem}.log
 \rm ${dir_run}/${datem}/rsl.*
 
- mpirun -np $norm_cores -machinefile ${dir_sub}/machinefile.${JOB_ID} ${dir_run}/${datem}/wrf.exe
-# mpirun -np $norm_cores ${dir_run}/${datem}/wrf.exe
+# mpirun -np $norm_cores -machinefile ${dir_sub}/machinefile.${JOB_ID} ${dir_run}/${datem}/wrf.exe
+mpirun -np $norm_cores ${dir_run}/${datem}/wrf.exe
 
 #touch ${dir_run}/${datem}/mem${emem}/wrf_done
 
