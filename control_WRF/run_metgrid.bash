@@ -19,7 +19,7 @@
 #############################################################
 
 datem=2016050112
-dateend=2016050212
+dateend=2016053112
 module load intel
 module load netcdf-serial
 
