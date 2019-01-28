@@ -11,7 +11,7 @@
 
 import sys
 import subprocess
-import shutil
+# import shutil
 import os
 import glob
 import warnings
@@ -30,8 +30,8 @@ start_date = datetime(2016, 5, 1, 12)
 # Define model configuration parameters
 wrf_param = {
     'rootdir': '/home/twixtrom/adaptive_WRF/',
-    'scriptsdir': '/home/twixtrom/adaptive_WRF/adaptive_WRF/',
-    'dir_run': '/lustre/scratch/twixtrom/adaptive_wrf_run/adaptive_run/',
+    'scriptsdir': '/home/twixtrom/adaptive_WRF/control_WRF/',
+    'dir_run': '/lustre/scratch/twixtrom/adaptive_wrf_run/control_thompson_run/',
     'dir_compressed_gfs': '/lustre/scratch/twixtrom/gfs_compress_201605/',
 
     #  Domain-Specific Parameters
@@ -73,7 +73,7 @@ wrf_param = {
     'dir_wps': '/lustre/work/twixtrom/WPSV3.5.1/',
     'dir_wrf': '/lustre/work/twixtrom/WRFV3.5.1/run/',
     'dir_sub': '/home/twixtrom/adaptive_WRF/adaptive_WRF/',
-    'dir_store': '/lustre/scratch/twixtrom/adaptive_wrf_save/adaptive_wrf/',
+    'dir_store': '/lustre/scratch/twixtrom/adaptive_wrf_save/control_thompson/',
     'dir_scratch': '/lustre/scratch/twixtrom/',
     'dir_gfs': '/lustre/scratch/twixtrom/gfs_data/',
 
@@ -137,10 +137,12 @@ def concat_files(inname, outname):
     :param outname: directory path and name of output file
     :return: None
     """
-    with open(outname, 'wb') as outfile:
-        for file in glob.glob(inname):
-            with open(file, 'rb') as f:
-                shutil.copyfileobj(f, outfile)
+    with open(outname, 'w') as outfile:
+        for fname in glob.glob(inname):
+            with open(fname) as infile:
+                for line in infile:
+                    outfile.write(line)
+    outfile.close()
 
 
 def create_wrf_namelist(fname, parameters):
@@ -226,7 +228,7 @@ eta_levels			    = 1.000, 0.995, 0.990, 0.985,
            parameters['model_Ny1'], parameters['model_Ny1_nest'],
            parameters['model_Nz']))
     f.write("""p_top_requested                     = {0},
-num_metgrid_levels                  = 27
+num_metgrid_levels                  = 32
 num_metgrid_soil_levels             = 4,
 dx                                  = {1}, {2}
 dy                                  = {3}, {4}
@@ -244,7 +246,7 @@ smooth_option                       = 0
 /
 
 """.format(parameters['iparent_st_nest'], parameters['jparent_st_nest'],
-           parameters['model_gridspx1_nest'], parameters['feedback']))
+           parameters['grid_ratio_nest'], parameters['feedback']))
     f.write("""&dfi_control
 dfi_opt                             = {},
 dfi_nfilter                         = 7,
@@ -350,6 +352,7 @@ nio_groups = 1,
 model_initial_date = increment_time(start_date, days=int(ndays))
 model_end_date = increment_time(model_initial_date, hours=wrf_param['fct_len_hrs'])
 datep = increment_time(model_initial_date, hours=-1)
+print('Starting forecast for: '+str(model_initial_date), flush=True)
 
 # Remove any existing namelist
 try:
@@ -359,6 +362,7 @@ except FileNotFoundError:
 
 # Generate namelist
 namelist = wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/namelist.input'
+print('Creating namelist.input as: '+namelist, flush=True)
 create_wrf_namelist(namelist, wrf_param)
 
 # Remove any existing wrfout files
@@ -366,34 +370,41 @@ for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H
     os.remove(file)
 
 # Call mpi for real.exe
-run_real_command = 'mpirun -np '+wrf_param['norm_cores']+' '+wrf_param['dir_run']+\
-                   model_initial_date.strftime('%Y%m%d%H')+'/real.exe'
-subprocess.run(run_real_command)
+print('Running real.exe', flush=True)
+run_real_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
+                    ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
+                    model_initial_date.strftime('%Y%m%d%H')+'/real.exe')
+real = subprocess.call(run_real_command, shell=True)
 
 # Combine log files into single log
-concat_files(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rslout*',
-             wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
-             model_initial_date.strftime('%Y%m%d%H')+'.log')
+concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
+             (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
+             model_initial_date.strftime('%Y%m%d%H')+'.log'))
 
 # Remove the logs
-for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rslout*'):
+for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
     os.remove(file)
 
 # Call mpi for wrf.exe
-run_real_command = 'mpirun -np '+wrf_param['norm_cores']+' '+wrf_param['dir_run']+\
-                   model_initial_date.strftime('%Y%m%d%H')+'/wrf.exe'
-subprocess.run(run_real_command)
+print('Running wrf.exe', flush=True)
+run_wrf_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
+                   ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
+                   model_initial_date.strftime('%Y%m%d%H')+'/wrf.exe')
+wrf = subprocess.call(run_wrf_command, shell=True)
+# wrf.wait()
 
 # Combine log files into single log
-concat_files(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rslout*',
-             wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
-             model_initial_date.strftime('%Y%m%d%H')+'.log')
+print('Moving log files', flush=True)
+concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
+             (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
+             model_initial_date.strftime('%Y%m%d%H')+'.log'))
 
 # Remove the logs
-for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rslout*'):
+for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
     os.remove(file)
 
 # Move wrfout files to storage
+print('Moving output', flush=True)
 move_wrf_files_command = ('mv '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+
                           '/wrfout_d01* '+wrf_param['dir_store']+
                           model_initial_date.strftime('%Y%m%d%H')+'/wrfout_d01_' +
@@ -403,5 +414,5 @@ move_wrf_files_command = ('mv '+wrf_param['dir_run']+model_initial_date.strftime
                           '/wrfout_d02* ' + wrf_param['dir_store'] +
                           model_initial_date.strftime('%Y%m%d%H') + '/wrfout_d02_' +
                           model_initial_date.strftime('%Y%m%d%H') + '.nc')
-subprocess.run(move_wrf_files_command)
-
+subprocess.run(move_wrf_files_command, shell=True)
+print('Finished with forecast initialized: '+model_initial_date)
