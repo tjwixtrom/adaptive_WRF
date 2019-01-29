@@ -16,7 +16,7 @@ import os
 import glob
 import warnings
 from datetime import datetime, timedelta
-# from pathlib import Path
+from pathlib import Path
 
 # import numpy as np
 
@@ -31,7 +31,7 @@ start_date = datetime(2016, 5, 1, 12)
 wrf_param = {
     'rootdir': '/home/twixtrom/adaptive_WRF/',
     'scriptsdir': '/home/twixtrom/adaptive_WRF/control_WRF/',
-    'dir_run': '/lustre/scratch/twixtrom/adaptive_wrf_run/control_thompson_run/',
+    'dir_run': '/lustre/scratch/twixtrom/adaptive_wrf_run/control_ETA_run/',
     'dir_compressed_gfs': '/lustre/scratch/twixtrom/gfs_compress_201605/',
 
     #  Domain-Specific Parameters
@@ -73,21 +73,21 @@ wrf_param = {
     'dir_wps': '/lustre/work/twixtrom/WPSV3.5.1/',
     'dir_wrf': '/lustre/work/twixtrom/WRFV3.5.1/run/',
     'dir_sub': '/home/twixtrom/adaptive_WRF/adaptive_WRF/',
-    'dir_store': '/lustre/scratch/twixtrom/adaptive_wrf_save/control_thompson/',
+    'dir_store': '/lustre/scratch/twixtrom/adaptive_wrf_save/control_ETA/',
     'dir_scratch': '/lustre/scratch/twixtrom/',
     'dir_gfs': '/lustre/scratch/twixtrom/gfs_data/',
 
     # Parameters for the model (not changed very often)
-    'model_mp_phys': 8,          # microphysics scheme
+    'model_mp_phys': 5,          # microphysics scheme
     'model_spec_zone': 1,    # number of grid points with tendencies
     'model_relax_zone': 4,   # number of blended grid points
     'dodfi': 0,                  # Do Dfi 3-yes 0-no
     'model_lw_phys': 1,          # model long wave scheme
     'model_sw_phys': 1,          # model short wave scheme
     'model_radt': 30,            # radiation time step (in minutes)
-    'model_sfclay_phys': 1,      # surface layer physics
+    'model_sfclay_phys': 2,      # surface layer physics
     'model_surf_phys': 2,        # land surface model
-    'model_pbl_phys': 1,         # pbl physics
+    'model_pbl_phys': 2,         # pbl physics
     'model_bldt': 0,             # boundary layer time steps (0 : each time steps, in min)
     'model_cu_phys': 6,          # cumulus param
     'model_cu_phys_nest': 0,     # cumulus param 3km
@@ -353,6 +353,9 @@ model_initial_date = increment_time(start_date, days=int(ndays))
 model_end_date = increment_time(model_initial_date, hours=wrf_param['fct_len_hrs'])
 datep = increment_time(model_initial_date, hours=-1)
 print('Starting forecast for: '+str(model_initial_date), flush=True)
+
+save_dir = wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')
+Path(save_dir).mkdir(parents=True, exist_ok=True)
 
 # Determine number of input metgrid levels
 # GFS changed from 27 to 32 on May 15, 2016
