@@ -1,1 +1,2 @@
-from analogue_algorithm import calc
+from .calc import *
+from .plots import *

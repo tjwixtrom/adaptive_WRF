@@ -6,7 +6,7 @@
 #$ -o sub_metgrid
 #$ -e error_metgrid
 #$ -q omni
-#$ -pe sm 1
+#$ -pe sm 36
 #$ -P quanah
 #$ -l h_rt=10:00:00
 
@@ -19,7 +19,7 @@
 #############################################################
 
 datem=2016050112
-dateend=2016050212
+dateend=2016051412
 module load intel
 module load netcdf-serial
 

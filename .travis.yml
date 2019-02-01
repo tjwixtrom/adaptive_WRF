@@ -6,7 +6,7 @@ notifications:
 
 # Install packages
 install:
-  - pip install numpy scipy netCDF4 pandas xarray dask
+  - pip install numpy scipy netCDF4 pandas xarray dask matplotlib
   - python setup.py install
 # command to run tests
 script:
