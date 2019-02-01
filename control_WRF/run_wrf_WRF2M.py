@@ -25,7 +25,7 @@ warnings.filterwarnings("ignore")
 ndays = sys.argv[1]
 
 # Define initial period start date
-start_date = datetime(2016, 5, 1, 12)
+start_date = datetime(2016, 5, 11, 12)
 
 # Define model configuration parameters
 wrf_param = {
@@ -360,7 +360,7 @@ Path(save_dir).mkdir(parents=True, exist_ok=True)
 
 # Determine number of input metgrid levels
 # GFS changed from 27 to 32 on May 15, 2016
-if model_initial_date < datetime(2016, 5, 15, 12):
+if model_initial_date < datetime(2016, 5, 11, 12):
     wrf_param['num_metgrid_levels'] = 27
 else:
     wrf_param['num_metgrid_levels'] = 32
