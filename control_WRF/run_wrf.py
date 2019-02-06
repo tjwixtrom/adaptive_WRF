@@ -348,6 +348,25 @@ nio_groups = 1,
     f.close()
 
 
+def check_logs(infile, logfile, date, wrf=False):
+    """
+    Check if success message is in real/wrf output logs
+
+    Parameters
+    infile: string file path to log summary
+    logfile: path to output log
+    wrf: bool, whether this is a log for wrf or real
+    """
+    f = open(logfile, 'a+')
+    logfile = open(infile)
+    last = logfile.readlines()[-1]
+    find = last.find('SUCCESS COMPLETE')
+    if find == -1:
+        if wrf:
+            f.write('WRF not complete '+str(date))
+        else:
+            f.write('REAL not complete '+str(date))
+
 # Find date and time of model start and end
 model_initial_date = increment_time(start_date, days=int(ndays))
 model_end_date = increment_time(model_initial_date, hours=wrf_param['fct_len_hrs'])
@@ -392,6 +411,11 @@ concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl
 for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
     os.remove(file)
 
+# Check for successful completion
+check_logs(wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
+           model_initial_date.strftime('%Y%m%d%H')+'.log',
+           wrf_param['dir_sub']+wrf_param['check_log'], model_initial_date)
+
 # Call mpi for wrf.exe
 print('Running wrf.exe', flush=True)
 run_wrf_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
@@ -409,6 +433,11 @@ concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl
 # Remove the logs
 for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
     os.remove(file)
+
+# Check for successful completion
+check_logs(wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
+           model_initial_date.strftime('%Y%m%d%H')+'.log',
+           wrf_param['dir_sub']+wrf_param['check_log'], model_initial_date, wrf=True)
 
 # Move wrfout files to storage
 print('Moving output', flush=True)
