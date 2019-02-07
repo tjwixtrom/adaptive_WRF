@@ -15,23 +15,48 @@ import subprocess
 import os
 import glob
 import warnings
-from datetime import datetime, timedelta
+import xarray as xr
+from scipy.ndimage import gaussian_filter
+import operator
+import pandas as pd
+from analogue_algorithm.wrf import increment_time, concat_files, create_wrf_namelist, \
+                                   check_logs
 # from pathlib import Path
 
 # import numpy as np
 
 warnings.filterwarnings("ignore")
 
-ndays = sys.argv[1]
-
+# ndays = sys.argv[1]
+ndays = 0
 # Define initial period start date
-start_date = datetime(2016, 5, 1, 12)
-
+# start_date = datetime(2016, 5, 2, 12)
+start_date = pd.to_datetime('2015-05-02T12:00:00')
+analogue_param = {
+    'sigma': 1.,
+    'pcp_threshold': 10.,
+    'sum_threshold': 50.,
+    'pcp_operator': operator.ge,
+    # 'dewpt_threshold': float(sys.argv[7]),
+    # 'dewpt_operator': operator.ge,
+    # 'mslp_threshold': float(sys.argv[9]),
+    # 'mslp_operator': operator.le,
+    # 'cape_threshold': float(sys.argv[6]),
+    # 'cape_operator': operator.ge,
+    # 'temp_2m_threshold': None,
+    # 'temp_2m_operator': None,
+    # 'height_500hPa_threshold': float(sys.argv[8]),
+    # 'height_500hPa_operator': operator.le,
+    'start_date': '2015-01-01T12:00:00',
+    'dt': '1D',
+    }
 # Define model configuration parameters
 wrf_param = {
+    'dir_control': '/lustre/scratch/twixtrom/adaptive_wrf_post/control_ETA',
+    'dir_dataset': '/lustre/scratch/twixtrom/dataset_variables',
     'rootdir': '/home/twixtrom/adaptive_WRF/',
-    'scriptsdir': '/home/twixtrom/adaptive_WRF/control_WRF/',
-    'dir_run': '/lustre/scratch/twixtrom/adaptive_wrf_run/control_thompson_run/',
+    'scriptsdir': '/home/twixtrom/adaptive_WRF/adaptive_WRF/',
+    'dir_run': '/lustre/scratch/twixtrom/adaptive_wrf_run/adaptive_run/',
     'dir_compressed_gfs': '/lustre/scratch/twixtrom/gfs_compress_201605/',
 
     #  Domain-Specific Parameters
@@ -117,244 +142,61 @@ wrf_param['otime_nest'] = wrf_param['output_intervalNEST'] / 60.
 wrf_param['model_BC_interval'] = wrf_param['dlbc'] * 60.
 
 
-def increment_time(date1, days=0, hours=0):
-    """
-    Increment time from start by a specified number of days or hours
-
-    Parameters:
-        date1: datetime.datetime
-        days: int, number of days to advance
-        hours: int, number of hours to advance
-    Returns: datetime.datetime, incremented time and date
-    """
-    return date1 + timedelta(days=days, hours=hours)
-
-
-def concat_files(inname, outname):
-    """
-    Concatenate text files into a single output
-    :param inname: directory path and name wildcard to input files
-    :param outname: directory path and name of output file
-    :return: None
-    """
-    with open(outname, 'w') as outfile:
-        for fname in glob.glob(inname):
-            with open(fname) as infile:
-                for line in infile:
-                    outfile.write(line)
-    outfile.close()
-
-
-def create_wrf_namelist(fname, parameters):
-    """
-    Create a WRF control namelist
-
-    :param fname: str, output file name string
-    :param parameters: dict, WRF configuration parameters
-    :return: Saves WRF control namelist as fname
-    """
-    f = open(fname, 'w')
-    f.write("""
-&time_control
-run_days                            = 0,
-run_hours                           = 0,
-run_minutes                         = {},
-run_seconds                         = 0,\n""".format(parameters['fct_len']))
-    # Model start time
-    f.write('start_year                          = {0}, {0},\n'.format(
-        model_initial_date.strftime('%Y')))
-    f.write('start_month                         = {0}, {0},\n'.format(
-        model_initial_date.strftime('%m')))
-    f.write('start_day                           = {0}, {0},\n'.format(
-        model_initial_date.strftime('%d')))
-    f.write('start_hour                          = {0}, {0},\n'.format(
-        model_initial_date.strftime('%H')))
-    f.write('start_minute                        = {0}, {0},\n'.format(
-        model_initial_date.strftime('%M')))
-    f.write('start_second                        = {0}, {0},\n'.format(
-        model_initial_date.strftime('%S')))
-
-    # Model end time
-    f.write('end_year                            = {0}, {0},\n'.format(
-        model_end_date.strftime('%Y')))
-    f.write('end_month                           = {0}, {0},\n'.format(
-        model_end_date.strftime('%m')))
-    f.write('end_day                             = {0}, {0},\n'.format(
-        model_end_date.strftime('%d')))
-    f.write('end_hour                            = {0}, {0},\n'.format(
-        model_end_date.strftime('%H')))
-    f.write('end_minute                          = {0}, {0},\n'.format(
-        model_end_date.strftime('%M')))
-    f.write('end_second                          = {0}, {0},\n'.format(
-        model_end_date.strftime('%S')))
-
-    f.write("""interval_seconds                    = {0}
-input_from_file                     = .true.,.true.,
-history_interval                    = {1}, {2},
-""".format(int(parameters['model_BC_interval']), parameters['output_interval'],
-               parameters['output_intervalNEST']))
-    f.write("""frames_per_outfile                  = {0}, {0},
-restart                             = .false.,
-restart_interval                    = 10000,
-io_form_history                     = 2
-io_form_restart                     = 2
-io_form_input                       = 2
-io_form_boundary                    = 2
-debug_level                         = 0
-nwp_diagnostics                     = {1}
-/
-
-&domains
-time_step                           = {2},
-time_step_fract_num                 = 0,
-time_step_fract_den                 = 1,
-max_dom                             = 2,
-""".format(parameters['model_num_in_output'], parameters['model_nwp_diagnostics'],
-           parameters['dt']))
-    f.write("""e_we                                = {0}, {1},
-e_sn                                = {2}, {3},
-e_vert                              = {4},  {4},
-eta_levels			    = 1.000, 0.995, 0.990, 0.985,
-                                       0.980, 0.970, 0.960, 0.950,
-                                       0.940, 0.930, 0.920, 0.910,
-                                       0.900, 0.880, 0.860, 0.830,
-                                       0.800, 0.770, 0.740, 0.710,
-                                       0.680, 0.640, 0.600, 0.560,
-                                       0.520, 0.480, 0.440, 0.400,
-                                       0.360, 0.320, 0.280, 0.240,
-                                       0.200, 0.160, 0.120, 0.080,
-                                       0.040, 0.000
-""".format(parameters['model_Nx1'], parameters['model_Nx1_nest'],
-           parameters['model_Ny1'], parameters['model_Ny1_nest'],
-           parameters['model_Nz']))
-    f.write("""p_top_requested                     = {0},
-num_metgrid_levels                  = 27
-num_metgrid_soil_levels             = 4,
-dx                                  = {1}, {2}
-dy                                  = {3}, {4}
-grid_id                             = 1,     2,
-parent_id                           = 0,    1,
-""".format(parameters['model_ptop'], parameters['model_gridspx1'],
-           parameters['model_gridspx1_nest'], parameters['model_gridspy1'],
-           parameters['model_gridspy1_nest']))
-    f.write("""i_parent_start                      = 1, {0}
-j_parent_start                      = 1, {1}
-parent_grid_ratio                   = 1, {2}
-parent_time_step_ratio              = 1, {2}
-feedback                            = {3},
-smooth_option                       = 0
-/
-
-""".format(parameters['iparent_st_nest'], parameters['jparent_st_nest'],
-           parameters['grid_ratio_nest'], parameters['feedback']))
-    f.write("""&dfi_control
-dfi_opt                             = {},
-dfi_nfilter                         = 7,
-dfi_write_filtered_input            = .false.,
-dfi_write_dfi_history               = .false.,
-dfi_cutoff_seconds                  = 3600,
-dfi_time_dim                        = 1000,
-""".format(parameters['dodfi']))
-    f.write("""dfi_bckstop_year                    = {0},
-dfi_bckstop_month                   = {1},
-dfi_bckstop_day                     = {2},
-dfi_bckstop_hour                    = {3},
-dfi_bckstop_minute                  = {4},
-dfi_bckstop_second                  = {5},
-""".format(datep.strftime('%Y'), datep.strftime('%m'), datep.strftime('%d'),
-           datep.strftime('%H'), datep.strftime('%M'), datep.strftime('%S')))
-    f.write("""dfi_fwdstop_year                    = {0},
-dfi_fwdstop_month                   = {1},
-dfi_fwdstop_day                     = {2},
-dfi_fwdstop_hour                    = {3},
-dfi_fwdstop_minute                  = {4},
-dfi_fwdstop_second                  = {5},
-/
-
-""".format(model_initial_date.strftime('%Y'), model_initial_date.strftime('%m'),
-           model_initial_date.strftime('%d'), model_initial_date.strftime('%H'),
-           model_initial_date.strftime('%M'), model_initial_date.strftime('%S')))
-    f.write("""&physics
-mp_physics                          = {0}, {0},
-ra_lw_physics                       = {1}, {1},
-ra_sw_physics                       = {2}, {2},
-radt                                = {3}, {3},
-sf_sfclay_physics                   = {4}, {4},
-sf_surface_physics                  = {5}, {5},
-""".format(parameters['model_mp_phys'], parameters['model_lw_phys'],
-           parameters['model_sw_phys'], parameters['model_radt'],
-           parameters['model_sfclay_phys'], parameters['model_surf_phys']))
-    f.write("""bl_pbl_physics                      = {0}, {0},
-bldt                                = {1}, {1},
-cu_physics                          = {2}, {3},
-cudt                                = {4}, {4},
-isfflx                              = {5},
-ifsnow                              = {6},
-icloud                              = {7},
-surface_input_source                = 1,
-num_soil_layers                     = {8},
-sf_urban_physics                    = 0,  0,
-do_radar_ref                        = {9}
-/
-
-&fdda
-/
-
-""".format(parameters['model_pbl_phys'], parameters['model_bldt'],
-           parameters['model_cu_phys'], parameters['model_cu_phys_nest'],
-           parameters['model_cudt'], parameters['model_use_surf_flux'],
-           parameters['model_use_snow'], parameters['model_use_cloud'],
-           parameters['model_soil_layers'], parameters['model_do_radar_ref']))
-    f.write("""&dynamics
-w_damping                           = {0},
-diff_opt                            = {1},
-km_opt                              = {2},
-diff_6th_opt                        = 0,
-diff_6th_factor                     = 0.12,
-base_temp                           = {3},
-damp_opt                            = {4},
-zdamp                               = {5}, {5},
-dampcoef                            = {6}, {6},
-khdif                               = 0,      0,
-kvdif                               = 0,      0,
-non_hydrostatic                     = .true., .true.,
-moist_adv_opt                       = 1,      1,
-scalar_adv_opt                      = 1,      1,
-mix_isotropic                       = 0,      0,
-mix_upper_bound                     = 0.1     0.1,
-iso_temp                            = 200.,
-/
-
-""".format(parameters['model_w_damping'], parameters['model_diff_opt'],
-           parameters['model_km_opt'], parameters['model_tbase'],
-           parameters['dampopt'], parameters['zdamp'], parameters['model_dampcoef']))
-    f.write("""&bdy_control
-spec_bdy_width                      = {0},
-spec_zone                           = {1},
-relax_zone                          = {2},
-specified                           = .true., .false.,
-nested                              = .false., .true.,
-/
-
-&grib2
-/
-
-&namelist_quilt
-nio_tasks_per_group = 0,
-nio_groups = 1,
-/
-""".format(parameters['assim_bzw'], parameters['model_spec_zone'],
-           parameters['model_relax_zone']))
-    f.close()
-
-
 # Find date and time of model start and end
 model_initial_date = increment_time(start_date, days=int(ndays))
 model_end_date = increment_time(model_initial_date, hours=wrf_param['fct_len_hrs'])
 datep = increment_time(model_initial_date, hours=-1)
 print('Starting forecast for: '+str(model_initial_date), flush=True)
 
-# Calcuate the closest analogue and best parameterization selections
+# Determine number of input metgrid levels
+# GFS changed from 27 to 32 on May 15, 2016
+if model_initial_date < pd.to_datetime('2016-05-12T12:00:00'):
+    wrf_param['num_metgrid_levels'] = 27
+else:
+    wrf_param['num_metgrid_levels'] = 32
+
+# Analogue selection and parameterization optimization section
+# Open the previous forecast from the thompson control and find the nearest analogue
+previous_forecast_time = increment_time(model_initial_date, hours=-24)
+previous_forecast_file_d02 = (wrf_param['dir_control']+'/' +
+                              previous_forecast_time.strftime('%Y%m%d%H')+'/wrfprst_d02_' +
+                              previous_forecast_time.strftime('%Y%m%d%H')+'.nc')
+forecast_d02_data = xr.open_dataset(previous_forecast_file_d02)
+forecast_pcp_d02 = forecast_d02_data['timestep_pcp'].isel(time=slice(30, 48))
+pcp_smooth = gaussian_filter(forecast_pcp_d02, analogue_param['sigma'])
+precip_d02_masked = forecast_pcp_d02.where(pcp_smooth >= analogue_param['pcp_threshold'])
+precip_sum_d02 = precip_d02_masked.sum(dim=['lat', 'lon'])
+sum_max = precip_sum_d02.max()
+max_time_idx = precip_sum_d02.argmax().item()
+
+# check if the max leadtime meets minimum criteria
+if sum_max >= analogue_param['sum_threshold']:
+    domain = 'd02'
+    leadtime = max_time_idx
+else:
+    domain = 'd01'
+    previous_forecast_file_d01 = (wrf_param['dir_control']+'/' +
+                                  previous_forecast_time.strftime('%Y%m%d%H')+'/wrfprst_d01_' +
+                                  previous_forecast_time.strftime('%Y%m%d%H')+'.nc')
+    forecast_d01_data = xr.open_dataset(previous_forecast_file_d01)
+    forecast_pcp_d01 = forecast_d01_data['timestep_pcp'].isel(time=slice(10, 16))
+    pcp_smooth = gaussian_filter(forecast_pcp_d01, analogue_param['sigma'])
+    precip_d01_masked = forecast_pcp_d01.where(pcp_smooth >= analogue_param['pcp_threshold'])
+    precip_sum_d01 = precip_d01_masked.sum(dim=['lat', 'lon'])
+    sum_max = precip_sum_d01.max()
+    if sum_max >= analogue_param['sum_threshold']:
+        max_time_idx = precip_sum_d01.argmax().item()
+        leadtime = max_time_idx * 3
+    else:
+        raise ValueError('Precipitation exceeding threshold not forecast')
+
+
+
+
+
+
+
+
 
 
 
@@ -364,63 +206,74 @@ print('Starting forecast for: '+str(model_initial_date), flush=True)
 
 
 # Remove any existing namelist
-try:
-    os.remove(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'namelist.input')
-except FileNotFoundError:
-    pass
-
-# Generate namelist
-namelist = wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/namelist.input'
-print('Creating namelist.input as: '+namelist, flush=True)
-create_wrf_namelist(namelist, wrf_param)
-
-# Remove any existing wrfout files
-for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/wrfout*'):
-    os.remove(file)
-
-# Call mpi for real.exe
-print('Running real.exe', flush=True)
-run_real_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
-                    ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
-                    model_initial_date.strftime('%Y%m%d%H')+'/real.exe')
-real = subprocess.call(run_real_command, shell=True)
-
-# Combine log files into single log
-concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
-             (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
-             model_initial_date.strftime('%Y%m%d%H')+'.log'))
-
-# Remove the logs
-for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
-    os.remove(file)
-
-# Call mpi for wrf.exe
-print('Running wrf.exe', flush=True)
-run_wrf_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
-                   ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
-                   model_initial_date.strftime('%Y%m%d%H')+'/wrf.exe')
-wrf = subprocess.call(run_wrf_command, shell=True)
-
-# Combine log files into single log
-print('Moving log files', flush=True)
-concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
-             (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
-             model_initial_date.strftime('%Y%m%d%H')+'.log'))
-
-# Remove the logs
-for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
-    os.remove(file)
-
-# Move wrfout files to storage
-print('Moving output', flush=True)
-move_wrf_files_command = ('mv '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+
-                          '/wrfout_d01* '+wrf_param['dir_store']+
-                          model_initial_date.strftime('%Y%m%d%H')+'/wrfout_d01_' +
-                          model_initial_date.strftime('%Y%m%d%H')+'.nc && '
-                          'mv ' + wrf_param['dir_run'] +
-                          model_initial_date.strftime('%Y%m%d%H') +
-                          '/wrfout_d02* ' + wrf_param['dir_store'] +
-                          model_initial_date.strftime('%Y%m%d%H') + '/wrfout_d02_' +
-                          model_initial_date.strftime('%Y%m%d%H') + '.nc')
-subprocess.run(move_wrf_files_command, shell=True)
-print('Finished with forecast initialized: '+model_initial_date)
+# try:
+#     os.remove(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'namelist.input')
+# except FileNotFoundError:
+#     pass
+#
+# # Generate namelist
+# namelist = wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/namelist.input'
+# print('Creating namelist.input as: '+namelist, flush=True)
+# create_wrf_namelist(namelist, wrf_param)
+#
+# # Remove any existing wrfout files
+# for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/wrfout*'):
+#     os.remove(file)
+#
+# # Call mpi for real.exe
+# print('Running real.exe', flush=True)
+# run_real_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
+#                     ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
+#                     model_initial_date.strftime('%Y%m%d%H')+'/real.exe')
+# real = subprocess.call(run_real_command, shell=True)
+#
+# # Combine log files into single log
+# concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
+#              (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
+#              model_initial_date.strftime('%Y%m%d%H')+'.log'))
+#
+# # Remove the logs
+# for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
+#     os.remove(file)
+#
+# # Check for successful completion
+# check_logs(wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
+#            model_initial_date.strftime('%Y%m%d%H')+'.log',
+#            wrf_param['dir_sub']+wrf_param['check_log'], model_initial_date)
+#
+# # Call mpi for wrf.exe
+# print('Running wrf.exe', flush=True)
+# run_wrf_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
+#                    ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
+#                    model_initial_date.strftime('%Y%m%d%H')+'/wrf.exe')
+# wrf = subprocess.call(run_wrf_command, shell=True)
+# # wrf.wait()
+#
+# # Combine log files into single log
+# print('Moving log files', flush=True)
+# concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
+#              (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
+#              model_initial_date.strftime('%Y%m%d%H')+'.log'))
+#
+# # Remove the logs
+# for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
+#     os.remove(file)
+#
+# # Check for successful completion
+# check_logs(wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
+#            model_initial_date.strftime('%Y%m%d%H')+'.log',
+#            wrf_param['dir_sub']+wrf_param['check_log'], model_initial_date, wrf=True)
+#
+# # Move wrfout files to storage
+# print('Moving output', flush=True)
+# move_wrf_files_command = ('mv '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+
+#                           '/wrfout_d01* '+wrf_param['dir_store']+
+#                           model_initial_date.strftime('%Y%m%d%H')+'/wrfout_d01_' +
+#                           model_initial_date.strftime('%Y%m%d%H')+'.nc && '
+#                           'mv ' + wrf_param['dir_run'] +
+#                           model_initial_date.strftime('%Y%m%d%H') +
+#                           '/wrfout_d02* ' + wrf_param['dir_store'] +
+#                           model_initial_date.strftime('%Y%m%d%H') + '/wrfout_d02_' +
+#                           model_initial_date.strftime('%Y%m%d%H') + '.nc')
+# subprocess.run(move_wrf_files_command, shell=True)
+# print('Finished with forecast initialized: '+model_initial_date)
