@@ -36,11 +36,10 @@ from analogue_algorithm.plots import plot_panels
 warnings.filterwarnings("ignore")
 plt.switch_backend('agg')
 
-# chunks = {'time': 10}
 chunks = None
 param = {
     'domain': sys.argv[1],
-    'sigma': 2.,
+    'sigma': float(sys.argv[10]),
     'directory': sys.argv[3],
     'method': sys.argv[2],
     'forecast_hour': float(sys.argv[4]),
@@ -60,7 +59,8 @@ param = {
     'an_start_date': '2015-10-01T12:00:00',
     'an_end_date': '2015-12-29T12:00:00',
     'dt': '1D',
-    'comments': 'Method testing for mslp threshold sensitivity'
+    'comments': 'Method testing for mslp threshold sensitivity',
+    'dataset_dir': '/lustre/scratch/twixtrom/dataset_variables/'
     }
 
 verif_param = {
@@ -86,12 +86,12 @@ f.close()
 
 if param['domain'] == '1':
     dx = '12km'
-    obsfile = '/lustre/scratch/twixtrom/ST4_2015_03h.nc'
+    obsfile = '/lustre/work/twixtrom/ST4_2015_03h.nc'
     outname_mp = param['directory']+'mp_an_ranks_12km_48h_'+param['method']+'.npy'
     outname_pbl = param['directory']+'pbl_an_ranks_12km_48h_'+param['method']+'.npy'
 elif param['domain'] == '2':
     dx = '4km'
-    obsfile = '/lustre/scratch/twixtrom/ST4_2015_01h.nc'
+    obsfile = '/lustre/work/twixtrom/ST4_2015_01h.nc'
     outname_mp = param['directory']+'mp_an_ranks_4km_48h_'+param['method']+'.npy'
     outname_pbl = param['directory']+'pbl_an_ranks_4km_48h_'+param['method']+'.npy'
 
@@ -106,7 +106,7 @@ print('Opening Dataset', flush=True)
 
 
 def open_pcp(hour, domain, dx):
-    pcpfile = '/lustre/scratch/twixtrom/adp_dataset_'+dx+'_timestep_pcp_f'+str(int(hour))+'.nc'
+    pcpfile = param['dataset_dir']+'adp_dataset_'+dx+'_timestep_pcp_f'+str(int(hour))+'.nc'
     precip = xr.open_dataset(pcpfile, chunks=chunks)
     precip.attrs['threshold'] = param['pcp_threshold']
     precip.attrs['sigma'] = param['sigma']
@@ -118,7 +118,7 @@ def open_pcp(hour, domain, dx):
 
 
 def open_dewpt(hour, domain, dx):
-    dewptfile = '/lustre/scratch/twixtrom/adp_dataset_'+dx+'_dewpt_2m_f'+str(int(hour))+'.nc'
+    dewptfile = param['dataset_dir']+'adp_dataset_'+dx+'_dewpt_2m_f'+str(int(hour))+'.nc'
     dew = xr.open_dataset(dewptfile, chunks=chunks)
     dew.attrs['threshold'] = param['dewpt_threshold']
     dew.attrs['sigma'] = param['sigma']
@@ -130,7 +130,7 @@ def open_dewpt(hour, domain, dx):
 
 
 def open_mslp(hour, domain, dx):
-    mslpfile = '/lustre/scratch/twixtrom/adp_dataset_'+dx+'_mslp_f'+str(int(hour))+'.nc'
+    mslpfile = param['dataset_dir']+'adp_dataset_'+dx+'_mslp_f'+str(int(hour))+'.nc'
     slp = xr.open_dataset(mslpfile, chunks=chunks)
     slp.attrs['threshold'] = param['mslp_threshold']
     slp.attrs['sigma'] = param['sigma']
@@ -142,7 +142,7 @@ def open_mslp(hour, domain, dx):
 
 
 def open_cape(hour, domain, dx):
-    file = '/lustre/scratch/twixtrom/adp_dataset_'+dx+'_cape_f'+str(int(hour))+'.nc'
+    file = param['dataset_dir']+'adp_dataset_'+dx+'_cape_f'+str(int(hour))+'.nc'
     cape = xr.open_dataset(file, chunks=chunks)
     cape.attrs['threshold'] = param['cape_threshold']
     cape.attrs['sigma'] = param['sigma']
@@ -154,7 +154,7 @@ def open_cape(hour, domain, dx):
 
 
 def open_temp(hour, domain, dx):
-    file = '/lustre/scratch/twixtrom/adp_dataset_'+dx+'_temp_2m_f'+str(int(hour))+'.nc'
+    file = param['dataset_dir']+'adp_dataset_'+dx+'_temp_2m_f'+str(int(hour))+'.nc'
     temp_2m = xr.open_dataset(file, chunks=chunks)
     temp_2m.attrs['threshold'] = param['temp_2m_threshold']
     temp_2m.attrs['sigma'] = param['sigma']
@@ -166,7 +166,7 @@ def open_temp(hour, domain, dx):
 
 
 def open_height(hour, domain, dx):
-    file = '/lustre/scratch/twixtrom/adp_dataset_'+dx+'_height_500hPa_f'+str(int(hour))+'.nc'
+    file = param['dataset_dir']+'adp_dataset_'+dx+'_height_500hPa_f'+str(int(hour))+'.nc'
     height_500hPa = xr.open_dataset(file, chunks=chunks)
     height_500hPa.attrs['threshold'] = param['height_500hPa_threshold']
     height_500hPa.attrs['sigma'] = param['sigma']

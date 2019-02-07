@@ -23,7 +23,8 @@ variables = ['temp',
              'timestep_pcp',
              'UH',
              'cape',
-             'refl']
+             'refl'
+             ]
 
 plevs = np.array([1000, 925, 850, 700, 500, 300, 250]) * units('hPa')
 # chunks = {'Time': 1}
