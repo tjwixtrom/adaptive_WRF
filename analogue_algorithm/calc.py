@@ -227,3 +227,19 @@ def find_analogue_precip_area(forecast_date, precipitation, *args):
     except ValueError:
         an_idx = np.nan
     return an_idx
+
+
+def find_max_coverage(data, dim=None):
+    """
+    Calculates the time of maximum coverage.
+
+    :param data: xarray.dataArray, input dataArray, should have attributes for smoothing
+                 and threshold defined.
+    :param dim: dimensions to find maximum over
+    """
+    data_smooth = gaussian_filter(data, data.sigma)
+    data_masked = data.where(data.operator(data_smooth, data.threshold))
+    data_sum = data_masked.sum(dim=dim)
+    sum_max = data_sum.max()
+    max_time_idx = data_sum.argmax().item()
+    return sum_max, max_time_idx

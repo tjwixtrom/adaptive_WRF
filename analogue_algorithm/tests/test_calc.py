@@ -10,11 +10,12 @@
 #
 ##############################################################################################
 import numpy as np
-from numpy.testing import assert_array_almost_equal, assert_almost_equal
-from analogue_algorithm.calc import rmse, find_analogue, verify_members
+from numpy.testing import assert_array_almost_equal, assert_almost_equal, assert_equal
+from analogue_algorithm.calc import rmse, find_analogue, verify_members, find_max_coverage
 import xarray as xr
 import pandas as pd
 import operator
+import pytest
 
 
 def test_rmse_no_diff():
@@ -93,7 +94,8 @@ def test_verif_members():
                      coords={'time': date_array,
                              'lat': (['latitude', 'longitude'], mlat),
                              'lon': (['latitude', 'longitude'], mlon)})
-    tot_rmse = verify_members(dataset, obs.total_precipitation, param, mem_list)
+    with pytest.warns(RuntimeWarning):
+        tot_rmse = verify_members(dataset, obs.total_precipitation, param, mem_list)
     members = np.array([tot_rmse[mem] for mem in mem_list])
     best_mem = np.nanargmin(members)
     assert_almost_equal(best_mem, 1, 4)
@@ -126,3 +128,26 @@ def test_find_analogue_multi_vars():
     dataset2.attrs['operator'] = operator.gt
     an_idx = find_analogue(date_array[-1], dataset, dataset2)
     assert_almost_equal(an_idx, 3, 4)
+
+
+def test_find_max_coverage():
+    """tests the find_analogue function"""
+    date_array = pd.date_range(start='2015-12-28T12:00:00',
+                               end='2016-01-01T12:00:00',
+                               freq='1D')
+    data = np.ones((5, 10, 10)) * np.linspace(0, 50, 500).reshape(5, 10, 10)
+    lat = np.linspace(40, 45, 10)
+    lon = np.linspace(-105, -100, 10)
+    mlon, mlat = np.meshgrid(lon, lat)
+    dataset = xr.DataArray(data=data,
+                           coords={'time': date_array,
+                                   'lat': (['latitude', 'longitude'], mlat),
+                                   'lon': (['latitude', 'longitude'], mlon)},
+                           dims=['time', 'latitude', 'longitude'])
+
+    dataset.attrs['threshold'] = 10
+    dataset.attrs['sigma'] = 1
+    dataset.attrs['operator'] = operator.ge
+    sum_max, max_idx = find_max_coverage(dataset, dim=['latitude', 'longitude'])
+    assert_almost_equal(sum_max, 4504.00801, 4)
+    assert_equal(max_idx, 4)

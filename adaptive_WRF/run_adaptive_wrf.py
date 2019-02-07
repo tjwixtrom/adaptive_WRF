@@ -21,6 +21,7 @@ import operator
 import pandas as pd
 from analogue_algorithm.wrf import increment_time, concat_files, create_wrf_namelist, \
                                    check_logs
+from analogue_algorithm.calc import find_max_coverage
 # from pathlib import Path
 
 # import numpy as np
@@ -163,16 +164,15 @@ previous_forecast_file_d02 = (wrf_param['dir_control']+'/' +
                               previous_forecast_time.strftime('%Y%m%d%H')+'.nc')
 forecast_d02_data = xr.open_dataset(previous_forecast_file_d02)
 forecast_pcp_d02 = forecast_d02_data['timestep_pcp'].isel(time=slice(30, 48))
-pcp_smooth = gaussian_filter(forecast_pcp_d02, analogue_param['sigma'])
-precip_d02_masked = forecast_pcp_d02.where(pcp_smooth >= analogue_param['pcp_threshold'])
-precip_sum_d02 = precip_d02_masked.sum(dim=['lat', 'lon'])
-sum_max = precip_sum_d02.max()
-max_time_idx = precip_sum_d02.argmax().item()
+forecast_pcp_d02.attrs['sigma'] = analogue_param['sigma']
+forecast_pcp_d02.attrs['threshold'] = analogue_param['threshold']
+forecast_pcp_d02.attrs['operator'] = operator.ge
 
+sum_max_d02, max_time_idx_d02 = find_max_coverage(forecast_pcp_d02, dim=['lat', 'lon'])
 # check if the max leadtime meets minimum criteria
-if sum_max >= analogue_param['sum_threshold']:
+if sum_max_d02 >= analogue_param['sum_threshold']:
     domain = 'd02'
-    leadtime = max_time_idx
+    leadtime = max_time_idx_d02
 else:
     domain = 'd01'
     previous_forecast_file_d01 = (wrf_param['dir_control']+'/' +
@@ -180,13 +180,12 @@ else:
                                   previous_forecast_time.strftime('%Y%m%d%H')+'.nc')
     forecast_d01_data = xr.open_dataset(previous_forecast_file_d01)
     forecast_pcp_d01 = forecast_d01_data['timestep_pcp'].isel(time=slice(10, 16))
-    pcp_smooth = gaussian_filter(forecast_pcp_d01, analogue_param['sigma'])
-    precip_d01_masked = forecast_pcp_d01.where(pcp_smooth >= analogue_param['pcp_threshold'])
-    precip_sum_d01 = precip_d01_masked.sum(dim=['lat', 'lon'])
-    sum_max = precip_sum_d01.max()
-    if sum_max >= analogue_param['sum_threshold']:
-        max_time_idx = precip_sum_d01.argmax().item()
-        leadtime = max_time_idx * 3
+    forecast_pcp_d01.attrs['sigma'] = analogue_param['sigma']
+    forecast_pcp_d01.attrs['threshold'] = analogue_param['threshold']
+    forecast_pcp_d01.attrs['operator'] = operator.ge
+    sum_max_d01, max_time_idx_d01 = find_max_coverage(forecast_pcp_d01, dim=['lat', 'lon'])
+    if sum_max_d01 >= analogue_param['sum_threshold']:
+        leadtime = max_time_idx_d01 * 3
     else:
         raise ValueError('Precipitation exceeding threshold not forecast')
 
