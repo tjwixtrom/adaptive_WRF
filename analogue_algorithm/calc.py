@@ -38,38 +38,35 @@ def rmse(predictions, targets, axis=None, nan=False):
     return rmse_data
 
 
-def find_analogue(forecast_date, *args):
+def find_analogue(forecast, dataset, mean=False):
     """
         Finds the index value of the closest analogue within the input dataset
 
-        :param forecast_date: datetime object or numpy.datetime64 object for forecast date.
-            Forecast date should be included within dataset.
-        :param args: xarray datasets containing analgoue forecasts. Ensemble mean should be
+        :param forecast: ordered list of forecast variable arrays for a single forecast time
+        :param dataset:  list of xarray datasets containing analgoue forecast variables
+            corresponding to the forecast variable list. Ensemble mean should be
             named 'mean' in each dataset. One dataset for each variable. Dataset dimensions
             should include initialized time, forecast hour, latitude, and longitude. Global
             attributes for sigma and threshold should also be defined.
+        :param mean: bool, if True, calculate ensemble mean and add to dataset list
         :return: index of closest analogue
         """
-    score = np.zeros(args[0].time.where(args[0].time < np.datetime64(forecast_date),
-                                        drop=True).shape)
-    for arg in args:
-        if 'mean' not in arg.data_vars.keys():
-            fcst_mean = xr.concat([arg[mem] for mem in arg.data_vars.keys()],
+    score = np.zeros(dataset[0].time.shape[0])
+    for forecast_var, data_var in zip(forecast, dataset):
+        if mean:
+            data_mean = xr.concat([data_var[mem] for mem in data_var.data_vars.keys()],
                                   dim='Member').mean(dim='Member')
-            arg['mean'] = fcst_mean
-        sigma = arg.sigma
-        threshold = arg.threshold
-
-        fcst_mean = arg['mean'].sel(time=forecast_date, drop=True)
+            data_var['mean'] = data_mean
+        sigma = data_var.sigma
+        threshold = data_var.threshold
 
         # Smooth and mask forecast mean
-        fcst_smooth = gaussian_filter(fcst_mean, sigma)
-        operator = arg.operator
-        fcst_masked = fcst_mean.where(operator(fcst_smooth, threshold))
+        fcst_smooth = gaussian_filter(forecast_var, sigma)
+        operator = data_var.operator
+        fcst_masked = forecast_var.where(operator(fcst_smooth, threshold))
 
         # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-        dataset_mean = arg['mean'].where(arg.time < np.datetime64(forecast_date),
-                                         drop=True)
+        dataset_mean = data_var['mean']
         dataset_mean_masked = dataset_mean.where(operator(fcst_smooth, threshold))
 
         # Actually find the index of the closest analogue
@@ -240,6 +237,7 @@ def find_max_coverage(data, dim=None):
     data_smooth = gaussian_filter(data, data.sigma)
     data_masked = data.where(data.operator(data_smooth, data.threshold))
     data_sum = data_masked.sum(dim=dim)
-    sum_max = data_sum.max()
-    max_time_idx = data_sum.argmax().item()
-    return sum_max, max_time_idx
+    sum_max = data_sum.max().item()
+    max_time_idx = data_sum.argmax().data
+    max_time = data.time.isel(time=max_time_idx).item()
+    return sum_max, pd.Timestamp(max_time)

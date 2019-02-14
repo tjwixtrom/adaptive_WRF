@@ -7,7 +7,6 @@
 #$ -pe sm 36
 #$ -P quanah
 #$ -t 1-93:1
-#$ -l h_rt=01:00:00
 
 # Array job script for running UPP/unipost for each member in an ensemble set
 #

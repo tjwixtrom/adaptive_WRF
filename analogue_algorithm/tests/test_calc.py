@@ -58,8 +58,10 @@ def test_find_analogue():
     dataset.attrs['threshold'] = 10
     dataset.attrs['sigma'] = 5
     dataset.attrs['operator'] = operator.gt
-    an_idx = find_analogue(date_array[-1], dataset)
-    assert_almost_equal(an_idx, 3, 4)
+    fdata = dataset['mean'].sel(time=date_array[-1])
+    print(date_array)
+    an_idx = find_analogue([fdata], [dataset])
+    assert_almost_equal(an_idx, 4, 4)
 
 
 def test_verif_members():
@@ -119,19 +121,21 @@ def test_find_analogue_multi_vars():
     dataset.attrs['operator'] = operator.gt
 
     dataset2 = xr.Dataset({'mem1': (['time', 'latitude', 'longitude'], data * 0.5),
-                           'mem2': (['time', 'latitude', 'longitude'], data * 2)},
+                           'mean': (['time', 'latitude', 'longitude'], data * 2)},
                           coords={'time': date_array,
                                   'lat': (['latitude', 'longitude'], mlat),
                                   'lon': (['latitude', 'longitude'], mlon)})
     dataset2.attrs['threshold'] = 8
     dataset2.attrs['sigma'] = 5
     dataset2.attrs['operator'] = operator.gt
-    an_idx = find_analogue(date_array[-1], dataset, dataset2)
-    assert_almost_equal(an_idx, 3, 4)
+    fdata1 = dataset['mean'].sel(time=date_array[-1])
+    fdata2 = dataset2['mean'].sel(time=date_array[-1])
+    an_idx = find_analogue([fdata1, fdata2], [dataset, dataset2])
+    assert_almost_equal(an_idx, 4, 4)
 
 
 def test_find_max_coverage():
-    """tests the find_analogue function"""
+    """Tests the find_analogue function"""
     date_array = pd.date_range(start='2015-12-28T12:00:00',
                                end='2016-01-01T12:00:00',
                                freq='1D')
@@ -148,6 +152,6 @@ def test_find_max_coverage():
     dataset.attrs['threshold'] = 10
     dataset.attrs['sigma'] = 1
     dataset.attrs['operator'] = operator.ge
-    sum_max, max_idx = find_max_coverage(dataset, dim=['latitude', 'longitude'])
+    sum_max, max_time = find_max_coverage(dataset, dim=['latitude', 'longitude'])
     assert_almost_equal(sum_max, 4504.00801, 4)
-    assert_equal(max_idx, 4)
+    assert_equal(max_time, pd.to_datetime('2016-01-01T12:00:00'))
