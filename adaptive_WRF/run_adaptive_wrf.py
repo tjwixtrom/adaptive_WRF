@@ -8,22 +8,23 @@
 # 22 January 2019
 #
 ##############################################################################################
-
-import sys
-import subprocess
-# import shutil
-import os
-import glob
-import warnings
-import xarray as xr
-from scipy.ndimage import gaussian_filter
+# import sys
+# import subprocess
+# # import shutil
+# import os
+# import glob
 import operator
-import pandas as pd
-from analogue_algorithm.wrf import increment_time, concat_files, create_wrf_namelist, \
-                                   check_logs
-from analogue_algorithm.calc import find_max_coverage
-# from pathlib import Path
+import warnings
 
+from analogue_algorithm import (check_logs, concat_files, create_wrf_namelist,
+                                find_max_coverage, find_analogue,
+                                find_analogue_precip_area, increment_time)
+
+import numpy as np
+from netCDF4 import num2date
+import pandas as pd
+import xarray as xr
+# from pathlib import Path
 # import numpy as np
 
 warnings.filterwarnings("ignore")
@@ -31,29 +32,30 @@ warnings.filterwarnings("ignore")
 # ndays = sys.argv[1]
 ndays = 0
 # Define initial period start date
-# start_date = datetime(2016, 5, 2, 12)
-start_date = pd.to_datetime('2015-05-02T12:00:00')
+start_date = pd.Timestamp(2016, 5, 2, 12)
+chunks = None
+mem_list = ['mem'+str(i) for i in range(1, 21)]
+mp_list = ['mem'+str(i) for i in range(1, 11)]
+pbl_list = ['mem1', *['mem'+str(i) for i in range(11, 21)]]
+
 analogue_param = {
     'sigma': 1.,
     'pcp_threshold': 10.,
     'sum_threshold': 50.,
     'pcp_operator': operator.ge,
-    # 'dewpt_threshold': float(sys.argv[7]),
-    # 'dewpt_operator': operator.ge,
-    # 'mslp_threshold': float(sys.argv[9]),
-    # 'mslp_operator': operator.le,
-    # 'cape_threshold': float(sys.argv[6]),
-    # 'cape_operator': operator.ge,
-    # 'temp_2m_threshold': None,
-    # 'temp_2m_operator': None,
-    # 'height_500hPa_threshold': float(sys.argv[8]),
-    # 'height_500hPa_operator': operator.le,
+    'logfile': '/home/twixtrom/adaptive_WRF/adaptive_WRF/an_selection_log_201605.log',
+    'cape_threshold': 1000.,
+    'cape_operator': operator.ge,
+    'height_500hPa_threshold': 5700.,
+    'height_500hPa_operator': operator.le,
     'start_date': '2015-01-01T12:00:00',
-    'dt': '1D',
-    }
+    'dataset_dir': '/lustre/scratch/twixtrom/dataset_variables/',
+    'mp_an_method': 'Different Points - pcpT00+hgt500f00+capeT-3',
+    'pbl_an_method': 'Same Points - pcpT00+hgt500T00',
+    'dt': '1D'}
 # Define model configuration parameters
 wrf_param = {
-    'dir_control': '/lustre/scratch/twixtrom/adaptive_wrf_post/control_ETA',
+    'dir_control': '/lustre/scratch/twixtrom/adaptive_wrf_post/control_thompson',
     'dir_dataset': '/lustre/scratch/twixtrom/dataset_variables',
     'rootdir': '/home/twixtrom/adaptive_WRF/',
     'scriptsdir': '/home/twixtrom/adaptive_WRF/adaptive_WRF/',
@@ -130,8 +132,7 @@ wrf_param = {
     'model_nwp_diagnostics': 1,
     'model_do_radar_ref': 1,
     'dampopt': 3,
-    'zdamp': 5000.
-}
+    'zdamp': 5000.}
 
 # Calculated terms
 
@@ -147,7 +148,7 @@ wrf_param['model_BC_interval'] = wrf_param['dlbc'] * 60.
 model_initial_date = increment_time(start_date, days=int(ndays))
 model_end_date = increment_time(model_initial_date, hours=wrf_param['fct_len_hrs'])
 datep = increment_time(model_initial_date, hours=-1)
-print('Starting forecast for: '+str(model_initial_date), flush=True)
+print('Starting forecast for: ' + str(model_initial_date), flush=True)
 
 # Determine number of input metgrid levels
 # GFS changed from 27 to 32 on May 15, 2016
@@ -158,50 +159,143 @@ else:
 
 # Analogue selection and parameterization optimization section
 # Open the previous forecast from the thompson control and find the nearest analogue
-previous_forecast_time = increment_time(model_initial_date, hours=-24)
-previous_forecast_file_d02 = (wrf_param['dir_control']+'/' +
-                              previous_forecast_time.strftime('%Y%m%d%H')+'/wrfprst_d02_' +
-                              previous_forecast_time.strftime('%Y%m%d%H')+'.nc')
-forecast_d02_data = xr.open_dataset(previous_forecast_file_d02)
-forecast_pcp_d02 = forecast_d02_data['timestep_pcp'].isel(time=slice(30, 48))
-forecast_pcp_d02.attrs['sigma'] = analogue_param['sigma']
-forecast_pcp_d02.attrs['threshold'] = analogue_param['threshold']
-forecast_pcp_d02.attrs['operator'] = operator.ge
 
-sum_max_d02, max_time_idx_d02 = find_max_coverage(forecast_pcp_d02, dim=['lat', 'lon'])
+# Open output log file
+logfile = open(analogue_param['logfile'], 'a+')
+
+# Define times that can be selected as possible analogue matching times,
+# must be between forecast hours 6 and 24.
+an_times_d02 = pd.date_range(start=increment_time(model_initial_date, hours=6),
+                             end=increment_time(model_initial_date, hours=24),
+                             freq='H')
+
+previous_forecast_time = increment_time(model_initial_date, hours=-24)
+previous_forecast_file_d02 = (wrf_param['dir_control'] + '/' +
+                              previous_forecast_time.strftime('%Y%m%d%H') + '/wrfprst_d02_' +
+                              previous_forecast_time.strftime('%Y%m%d%H') + '.nc')
+try:
+    forecast_d02_data = xr.open_dataset(previous_forecast_file_d02)
+except FileNotFoundError:
+    logfile.write(model_initial_date.strftime('%Y%m%d%H')+', None, None\n')
+    raise FileNotFoundError('File not found: '+previous_forecast_file_d02)
+forecast_pcp_d02 = forecast_d02_data['timestep_pcp'].sel(time=an_times_d02)
+forecast_pcp_d02.attrs['sigma'] = analogue_param['sigma']
+forecast_pcp_d02.attrs['threshold'] = analogue_param['pcp_threshold']
+forecast_pcp_d02.attrs['operator'] = operator.ge
+sum_max_d02, max_time_d02 = find_max_coverage(forecast_pcp_d02, dim=['y', 'x'])
+
 # check if the max leadtime meets minimum criteria
 if sum_max_d02 >= analogue_param['sum_threshold']:
     domain = 'd02'
-    leadtime = max_time_idx_d02
+    leadtime = max_time_d02 - model_initial_date
 else:
     domain = 'd01'
-    previous_forecast_file_d01 = (wrf_param['dir_control']+'/' +
-                                  previous_forecast_time.strftime('%Y%m%d%H')+'/wrfprst_d01_' +
-                                  previous_forecast_time.strftime('%Y%m%d%H')+'.nc')
-    forecast_d01_data = xr.open_dataset(previous_forecast_file_d01)
-    forecast_pcp_d01 = forecast_d01_data['timestep_pcp'].isel(time=slice(10, 16))
+    an_times_d01 = pd.date_range(start=increment_time(model_initial_date, hours=6),
+                                 end=increment_time(model_initial_date, hours=24), freq='3H')
+    previous_forecast_file_d01 = (wrf_param['dir_control'] + '/' +
+                                  previous_forecast_time.strftime('%Y%m%d%H') +
+                                  '/wrfprst_d01_' +
+                                  previous_forecast_time.strftime('%Y%m%d%H') + '.nc')
+    try:
+        forecast_d01_data = xr.open_dataset(previous_forecast_file_d01)
+    except FileNotFoundError:
+        logfile.write(model_initial_date.strftime('%Y%m%d%H') + ', None, None\n')
+        raise FileNotFoundError('File not found: ' + previous_forecast_file_d01)
+    forecast_pcp_d01 = forecast_d01_data['timestep_pcp'].sel(time=an_times_d01)
     forecast_pcp_d01.attrs['sigma'] = analogue_param['sigma']
-    forecast_pcp_d01.attrs['threshold'] = analogue_param['threshold']
+    forecast_pcp_d01.attrs['threshold'] = analogue_param['pcp_threshold']
     forecast_pcp_d01.attrs['operator'] = operator.ge
-    sum_max_d01, max_time_idx_d01 = find_max_coverage(forecast_pcp_d01, dim=['lat', 'lon'])
+    sum_max_d01, max_time_d01 = find_max_coverage(forecast_pcp_d01, dim=['y', 'x'])
     if sum_max_d01 >= analogue_param['sum_threshold']:
-        leadtime = max_time_idx_d01 * 3
+        leadtime = max_time_d01 - model_initial_date
     else:
+        logfile.write(model_initial_date.strftime('%Y%m%d%H')+', None, None\n')
         raise ValueError('Precipitation exceeding threshold not forecast')
 
+an_time = model_initial_date + leadtime
+print('Domain ', domain, 'and leadtime of ', leadtime.components.hours, ' hours selected for ',
+      'analogue comparison at ', an_time)
+
+leadtime_str = str(leadtime.components.hours)
+logfile.write(model_initial_date.strftime('%Y%m%d%H')+', '+domain+', '+leadtime_str+'\n')
+
+# subset previous forecast to analogue time and add analogue attributes
+an_pcp = forecast_d02_data['timestep_pcp'].sel(time=an_time)
+an_pcp.attrs['threshold'] = analogue_param['pcp_threshold']
+an_pcp.attrs['sigma'] = analogue_param['sigma']
+an_pcp.attrs['operator'] = analogue_param['pcp_operator']
 
 
+def open_pcp(hour, domain, param):
+    if domain == 'd01':
+        dx = '12km'
+    else:
+        dx = '4km'
+    pcpfile = param['dataset_dir']+'adp_dataset_'+dx+'_timestep_pcp_f'+hour+'.nc'
+    precip = xr.open_dataset(pcpfile, chunks=chunks)
+    precip.attrs['threshold'] = param['pcp_threshold']
+    precip.attrs['sigma'] = param['sigma']
+    precip.attrs['operator'] = param['pcp_operator']
+    fcst_mean = xr.concat([precip[mem] for mem in mem_list],
+                          dim='Member').mean(dim='Member')
+    precip['mean'] = fcst_mean
+    return precip
 
 
+def open_cape(hour, domain, param):
+    if domain == 'd01':
+        dx = '12km'
+    else:
+        dx = '4km'
+    file = param['dataset_dir']+'adp_dataset_'+dx+'_cape_f'+hour+'.nc'
+    cape = xr.open_dataset(file, chunks=chunks)
+    cape.attrs['threshold'] = param['cape_threshold']
+    cape.attrs['sigma'] = param['sigma']
+    cape.attrs['operator'] = param['cape_operator']
+    cape_mean = xr.concat([cape[mem] for mem in mem_list],
+                      dim='Member').mean(dim='Member')
+    cape['mean'] = cape_mean
+    return cape
 
 
+def open_height(hour, domain, param):
+    if domain == 'd01':
+        dx = '12km'
+    else:
+        dx = '4km'
+    file = param['dataset_dir']+'adp_dataset_'+dx+'_height_500hPa_f'+str(int(hour))+'.nc'
+    height_500hPa = xr.open_dataset(file, chunks=chunks)
+    height_500hPa.attrs['threshold'] = param['height_500hPa_threshold']
+    height_500hPa.attrs['sigma'] = param['sigma']
+    height_500hPa.attrs['operator'] = param['height_500hPa_operator']
+    height_500hPa_mean = xr.concat([height_500hPa[mem] for mem in mem_list],
+                                   dim='Member').mean(dim='Member')
+    height_500hPa['mean'] = height_500hPa_mean
+    return height_500hPa
 
 
+# Open the precip, height, and cape dataset files
+pcp_dataset = open_pcp(leadtime_str, domain, analogue_param)
+cape_dataset = open_cape(leadtime_str, domain, analogue_param)
+height_dataset = open_height(leadtime_str, domain, analogue_param)
+print(height_dataset)
 
+# Open height and cape for forecast dataset
 
+# Open the Stage4 precip observations file
+if domain == 'd01':
+    obsfile = '/lustre/work/twixtrom/ST4_2015_03h.nc'
+else:
+    obsfile = '/lustre/work/twixtrom/ST4_2015_01h.nc'
 
+stage4 = xr.open_dataset(obsfile, chunks=chunks, decode_cf=False)
+vtimes_stage4 = num2date(stage4.valid_times, stage4.valid_times.units)
+stage4.coords['time'] = np.array([np.datetime64(date) for date in vtimes_stage4])
+stage4['time'] = np.array([np.datetime64(date) for date in vtimes_stage4])
+stage4.coords['lat'] = stage4.lat
+stage4.coords['lon'] = stage4.lon
 
-
+mp_an_idx = find_analogue()
 
 
 # Remove any existing namelist
@@ -213,7 +307,7 @@ else:
 # # Generate namelist
 # namelist = wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/namelist.input'
 # print('Creating namelist.input as: '+namelist, flush=True)
-# create_wrf_namelist(namelist, wrf_param)
+# create_wrf_namelist(namelist, wrf_param, model_initial_date)
 #
 # # Remove any existing wrfout files
 # for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/wrfout*'):

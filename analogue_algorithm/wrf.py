@@ -1,18 +1,18 @@
-##############################################################################################
-# wrf.py - Functions for analogue score calculation
-#
-# by Tyler Wixtrom
-# Texas Tech University
-# 7 February 2019
-#
-# Helper code for WRF file operations.
-#
-##############################################################################################
-from datetime import timedelta
+"""
+wrf.py - Functions for analogue score calculation
+
+by Tyler Wixtrom
+Texas Tech University
+7 February 2019
+
+Helper code for WRF file operations.
+
+"""
+import glob
 from pandas import Timedelta
 
 
-def increment_time(date1, days=None, hours=None):
+def increment_time(date1, days=0, hours=0, minutes=0, seconds=0):
     """
     Increment time from start by a specified number of days or hours
 
@@ -21,8 +21,9 @@ def increment_time(date1, days=None, hours=None):
         days: int, number of days to advance
         hours: int, number of hours to advance
     Returns: pandas.datetime, incremented time and date
+
     """
-    return date1 + Timedelta(timedelta(days=days, hours=hours))
+    return date1 + Timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
 
 def concat_files(inname, outname):
@@ -41,14 +42,17 @@ def concat_files(inname, outname):
     outfile.close()
 
 
-def create_wrf_namelist(fname, parameters):
+def create_wrf_namelist(fname, parameters, model_initial_date):
     """
     Create a WRF control namelist
 
     :param fname: str, output file name string
     :param parameters: dict, WRF configuration parameters
+    :param model_initial_date: pandas.Timestamp, datetime object of model initialization
     :return: Saves WRF control namelist as fname
     """
+    model_end_date = increment_time(model_initial_date, hours=parameters['fct_len_hrs'])
+    datep = increment_time(model_initial_date, hours=-1)
     f = open(fname, 'w')
     f.write("""
 &time_control
@@ -252,6 +256,7 @@ def check_logs(infile, logfile, date, wrf=False):
     infile: string file path to log summary
     logfile: path to output log
     wrf: bool, whether this is a log for wrf or real
+
     """
     f = open(logfile, 'a+')
     logfile = open(infile)
@@ -259,6 +264,6 @@ def check_logs(infile, logfile, date, wrf=False):
     find = last.find('SUCCESS COMPLETE')
     if find == -1:
         if wrf:
-            f.write('WRF not complete '+str(date))
+            f.write('WRF not complete ' + str(date))
         else:
-            f.write('REAL not complete '+str(date))
+            f.write('REAL not complete ' + str(date))

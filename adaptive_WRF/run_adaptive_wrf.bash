@@ -23,5 +23,7 @@ module load netcdf-serial
 python_exec=/home/twixtrom/miniconda3/envs/analogue/bin/python
 param=/home/twixtrom/adaptive_WRF/adaptive_WRF/adaptive_parameters.bash
 ndays=$(( $SGE_TASK_ID - 1 ))
-
+if [[ ${ndays} -eq 0 ]] ; then
+    rm /home/twixtrom/adaptive_WRF/adaptive_WRF/an_selection_log_201605.log
+fi
 ${python_exec} ${ndays}
