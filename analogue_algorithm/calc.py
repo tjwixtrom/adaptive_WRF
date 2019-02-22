@@ -13,8 +13,31 @@
 import numpy as np
 import pandas as pd
 import xarray as xr
-
+import dask
+from dask.diagnostics import ProgressBar
 from scipy.ndimage import gaussian_filter
+
+
+@dask.delayed
+def rmse_dask(predictions, targets, axis=None, nan=False):
+    """
+    Root Mean Square Error (RMSE)
+
+    Calculate RMSE on grid or timeseries
+
+    :param predictions: array, forecast variable array.
+    :param targets: array, observation variable array.
+    :param axis: tuple, optional. Axes over which to perform calculation, If none, RMSE
+        calculated for entire array shape.
+    :param nan: bool, optional. Determines if nan values in inputs should result in
+        nan output. Default is to ignore nan points.
+    :return: Root Mean Square Error of predictions
+    """
+    if nan:
+        rmse_data = np.sqrt(np.mean(((predictions - targets) ** 2), axis=axis))
+    else:
+        rmse_data = np.sqrt(np.nanmean(((predictions - targets) ** 2), axis=axis))
+    return rmse_data
 
 
 def rmse(predictions, targets, axis=None, nan=False):
@@ -37,6 +60,11 @@ def rmse(predictions, targets, axis=None, nan=False):
         rmse_data = np.sqrt(np.nanmean(((predictions - targets) ** 2), axis=axis))
     return rmse_data
 
+# def rmse_xarray(predictions, targets, axis=None, nan=False):
+#     return xr.apply_ufunc(rmse, predictions, targets, kwargs={'axis': axis, 'nan': nan},
+#                           dask='parallelized', output_dtypes=[float],
+#                           output_core_dims=[()], vectorize=True)
+
 
 def find_analogue(forecast, dataset, mean=False):
     """
@@ -52,25 +80,33 @@ def find_analogue(forecast, dataset, mean=False):
         :return: index of closest analogue
         """
     score = np.zeros(dataset[0].time.shape[0])
+    argscore = []
     for forecast_var, data_var in zip(forecast, dataset):
-        if mean:
-            data_mean = xr.concat([data_var[mem] for mem in data_var.data_vars.keys()],
-                                  dim='Member').mean(dim='Member')
-            data_var['mean'] = data_mean
+        # if mean:
+        #     data_mean = xr.concat([data_var[mem] for mem in data_var.data_vars.keys()],
+        #                           dim='Member').mean(dim='Member')
+        #     data_var['mean'] = data_mean
         sigma = data_var.sigma
         threshold = data_var.threshold
 
         # Smooth and mask forecast mean
-        fcst_smooth = gaussian_filter(forecast_var, sigma)
+        fcst_smooth = xr.apply_ufunc(gaussian_filter, forecast_var, sigma, dask='allowed')
         operator = data_var.operator
-        fcst_masked = forecast_var.where(operator(fcst_smooth, threshold))
+        fcst_masked = forecast_var.where(operator(fcst_smooth, threshold), drop=True)
 
         # mask the mean, subset for up to current date, find closest analogues by mean RMSE
         dataset_mean = data_var['mean']
-        dataset_mean_masked = dataset_mean.where(operator(fcst_smooth, threshold))
-
+        dataset_mean_masked = dataset_mean.where(operator(fcst_smooth, threshold), drop=True)
         # Actually find the index of the closest analogue
-        score += rmse(dataset_mean_masked, fcst_masked, axis=(1, 2))
+        argscore.append(rmse_dask(dataset_mean_masked, fcst_masked, axis=(-2, -1)))
+
+    with ProgressBar():
+        for arg in dask.compute(*argscore):
+            if np.isnan(arg).all():
+                break
+            else:
+                score += arg
+
     try:
         an_idx = np.nanargmin(score)
     except ValueError:
@@ -158,7 +194,7 @@ def verify_members_grid(dataset, observations, parameters, mem_list):
     return tot_rmse
 
 
-def find_analogue_precip_area(forecast_date, precipitation, *args):
+def find_analogue_precip_area(forecast, dataset):
     """
         Finds the index value of the closest analogue within the input dataset
 
@@ -171,54 +207,30 @@ def find_analogue_precip_area(forecast_date, precipitation, *args):
             attributes for sigma and threshold should also be defined.
         :return: index of closest analogue
         """
-    if 'mean' not in precipitation.data_vars.keys():
-        fcst_precip_mean = xr.concat([precipitation[mem]
-                                      for mem in precipitation.data_vars.keys()],
-                                     dim='Member').mean(dim='Member')
-        precipitation['mean'] = fcst_precip_mean
-    sigma = precipitation.sigma
-    threshold = precipitation.threshold
-
-    fcst_mean_precipitation = precipitation['mean'].sel(time=forecast_date, drop=True)
-
+    sigma = dataset[0].sigma
+    threshold = dataset[0].threshold
+    score = np.zeros(dataset[0].time.shape[0])
     # Smooth and mask forecast mean
-    fcst_smooth_precipitation = gaussian_filter(fcst_mean_precipitation, sigma)
-    operator = precipitation.operator
-    fcst_masked_precipitation = fcst_mean_precipitation.where(
-        operator(
-            fcst_smooth_precipitation,
-            threshold))
-
-    # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-    dataset_mean_precipitation = precipitation['mean'].where(
-        precipitation.time < np.datetime64(forecast_date), drop=True)
-    dataset_mean_masked_precipitation = dataset_mean_precipitation.where(
-                                                                operator(
-                                                                    fcst_smooth_precipitation,
-                                                                    threshold))
-
-    # Actually find the index of the closest analogue
-    score = rmse(dataset_mean_masked_precipitation, fcst_masked_precipitation, axis=(1, 2))
-
-    for arg in args:
-        if 'mean' not in arg.data_vars.keys():
-            fcst_mean = xr.concat([arg[mem] for mem in arg.data_vars.keys()],
-                                  dim='Member').mean(dim='Member')
-            arg['mean'] = fcst_mean
-
-        fcst_mean = arg['mean'].sel(time=forecast_date, drop=True)
-
+    fcst_smooth = xr.apply_ufunc(gaussian_filter, forecast[0], sigma, dask='allowed')
+    operator = dataset[0].operator
+    argscore = []
+    for fcst, data in zip(forecast, dataset):
         # Mask based on smoothed precipitation field
-        fcst_masked = fcst_mean.where(operator(fcst_smooth_precipitation, threshold))
+        fcst_masked = fcst.where(operator(fcst_smooth, threshold), drop=True)
 
         # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-        dataset_mean = arg['mean'].where(arg.time < np.datetime64(forecast_date),
-                                         drop=True)
-        dataset_mean_masked = dataset_mean.where(operator(fcst_smooth_precipitation,
-                                                          threshold))
+        dataset_mean = data['mean'].where(operator(fcst_smooth, threshold), drop=True)
 
         # Actually find the index of the closest analogue
-        score += rmse(dataset_mean_masked, fcst_masked, axis=(1, 2))
+        argscore.append(rmse_dask(dataset_mean, fcst_masked, axis=(-2, -1)))
+
+    with ProgressBar():
+        for arg in dask.compute(*argscore):
+            if np.isnan(arg).all():
+                break
+            else:
+                score += arg
+
     try:
         an_idx = np.nanargmin(score)
     except ValueError:
@@ -234,10 +246,10 @@ def find_max_coverage(data, dim=None):
                  and threshold defined.
     :param dim: dimensions to find maximum over
     """
-    data_smooth = gaussian_filter(data, data.sigma)
+    data_smooth = gaussian_filter(data, data.attrs['sigma'])
     data_masked = data.where(data.operator(data_smooth, data.threshold))
     data_sum = data_masked.sum(dim=dim)
-    sum_max = data_sum.max().item()
+    sum_max = data_sum.max().data
     max_time_idx = data_sum.argmax().data
     max_time = data.time.isel(time=max_time_idx).item()
     return sum_max, pd.Timestamp(max_time)

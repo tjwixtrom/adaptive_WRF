@@ -11,7 +11,8 @@
 ##############################################################################################
 import numpy as np
 from numpy.testing import assert_array_almost_equal, assert_almost_equal, assert_equal
-from analogue_algorithm.calc import rmse, find_analogue, verify_members, find_max_coverage
+from analogue_algorithm.calc import rmse, find_analogue, verify_members, find_max_coverage, \
+    find_analogue_precip_area
 import xarray as xr
 import pandas as pd
 import operator
@@ -155,3 +156,34 @@ def test_find_max_coverage():
     sum_max, max_time = find_max_coverage(dataset, dim=['latitude', 'longitude'])
     assert_almost_equal(sum_max, 4504.00801, 4)
     assert_equal(max_time, pd.to_datetime('2016-01-01T12:00:00'))
+
+
+def test_find_analogue_precip_area():
+    """tests the find_analogue function with multiple inputs"""
+    date_array = pd.date_range(start='2015-12-28T12:00:00',
+                               end='2016-01-01T12:00:00',
+                               freq='1D')
+    data = np.ones((5, 10, 10)) * np.linspace(0, 50, 500).reshape(5, 10, 10)
+    lat = np.linspace(40, 45, 10)
+    lon = np.linspace(-105, -100, 10)
+    mlon, mlat = np.meshgrid(lon, lat)
+    dataset = xr.Dataset({'mean': (['time', 'latitude', 'longitude'], data)},
+                         coords={'time': date_array,
+                                 'lat': (['latitude', 'longitude'], mlat),
+                                 'lon': (['latitude', 'longitude'], mlon)})
+    dataset.attrs['threshold'] = 10
+    dataset.attrs['sigma'] = 5
+    dataset.attrs['operator'] = operator.gt
+
+    dataset2 = xr.Dataset({'mem1': (['time', 'latitude', 'longitude'], data * 0.5),
+                           'mean': (['time', 'latitude', 'longitude'], data * 2)},
+                          coords={'time': date_array,
+                                  'lat': (['latitude', 'longitude'], mlat),
+                                  'lon': (['latitude', 'longitude'], mlon)})
+    dataset2.attrs['threshold'] = 8
+    dataset2.attrs['sigma'] = 5
+    dataset2.attrs['operator'] = operator.gt
+    fdata1 = dataset['mean'].sel(time=date_array[-1])
+    fdata2 = dataset2['mean'].sel(time=date_array[-1])
+    an_idx = find_analogue_precip_area([fdata1, fdata2], [dataset, dataset2])
+    assert_almost_equal(an_idx, 4, 4)
