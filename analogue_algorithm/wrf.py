@@ -264,6 +264,6 @@ def check_logs(infile, logfile, date, wrf=False):
     find = last.find('SUCCESS COMPLETE')
     if find == -1:
         if wrf:
-            f.write('WRF not complete ' + str(date))
+            f.write('WRF not complete ' + str(date)+'\n')
         else:
-            f.write('REAL not complete ' + str(date))
+            f.write('REAL not complete ' + str(date)+'\n')

@@ -35,7 +35,7 @@ warnings.filterwarnings("ignore")
 ndays = sys.argv[1]
 # ndays = 0
 # Define initial period start date
-start_date = pd.Timestamp(2016, 5, 2, 12)
+start_date = pd.Timestamp(2016, 1, 2, 12)
 # chunks_forecast = {'time': 1, 'pressure': 1}
 # chunks_dataset = {'time': 1}
 chunks_forecast = None
@@ -47,9 +47,9 @@ pbl_list = ['mem1', *['mem'+str(i) for i in range(11, 21)]]
 analogue_param = {
     'sigma': 1.,
     'pcp_threshold': 10.,
-    'sum_threshold': 500.,
+    'sum_threshold': 50.,
     'pcp_operator': operator.ge,
-    'logfile': '/home/twixtrom/adaptive_WRF/adaptive_WRF/an_selection_log_201605.log',
+    'logfile': '/home/twixtrom/adaptive_WRF/adaptive_WRF/an_selection_log_201601.log',
     'cape_threshold': 1000.,
     'cape_operator': operator.ge,
     'height_500hPa_threshold': 5700.,
@@ -91,7 +91,7 @@ wrf_param = {
     'rootdir': '/home/twixtrom/adaptive_WRF/',
     'scriptsdir': '/home/twixtrom/adaptive_WRF/adaptive_WRF/',
     'dir_run': '/lustre/scratch/twixtrom/adaptive_wrf_run/adaptive_run/',
-    'dir_compressed_gfs': '/lustre/scratch/twixtrom/gfs_compress_201605/',
+    'dir_compressed_gfs': '/lustre/scratch/twixtrom/gfs_compress_201601/',
     'check_log': 'check_log_adaptive.log',
 
     #  Domain-Specific Parameters

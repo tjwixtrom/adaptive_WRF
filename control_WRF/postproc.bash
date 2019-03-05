@@ -6,7 +6,7 @@
 #$ -q omni
 #$ -pe sm 36
 #$ -P quanah
-#$ -t 1-93:1
+#$ -t 1-62:1
 
 # Array job script for running UPP/unipost for each member in an ensemble set
 #
@@ -14,16 +14,13 @@
 # Texas Tech University
 # 27 March 2018
 
-date1=2016050112
+date1=2016070112
 if [ ${SGE_TASK_ID} -le 31 ] ; then
     name='control_ETA'
     ndays=$(( $SGE_TASK_ID - 1 ))
-elif [ ${SGE_TASK_ID} -gt 31 ] && [ ${SGE_TASK_ID} -le 62 ] ; then
-    name='control_WRF2M'
-    ndays=$(( $SGE_TASK_ID - 32 ))
 else
     name='control_thompson'
-    ndays=$(( $SGE_TASK_ID - 63 ))
+    ndays=$(( $SGE_TASK_ID - 32 ))
 fi
 
 runscript=/home/twixtrom/adaptive_WRF/control_WRF/pwpp.py
