@@ -35,7 +35,7 @@ warnings.filterwarnings("ignore")
 ndays = sys.argv[1]
 # ndays = 0
 # Define initial period start date
-start_date = pd.Timestamp(2016, 1, 2, 12)
+start_date = pd.Timestamp(2016, 7, 2, 12)
 # chunks_forecast = {'time': 1, 'pressure': 1}
 # chunks_dataset = {'time': 1}
 chunks_forecast = None
@@ -200,7 +200,7 @@ logfile = open(analogue_param['logfile'], 'a+')
 
 # Define times that can be selected as possible analogue matching times,
 # must be between forecast hours 6 and 24.
-an_times_d02 = pd.date_range(start=increment_time(model_initial_date, hours=6),
+an_times_d02 = pd.date_range(start=increment_time(model_initial_date, hours=12),
                              end=increment_time(model_initial_date, hours=24),
                              freq='H')
 
@@ -228,7 +228,7 @@ else:
     domain = 'd01'
     del forecast_pcp_d02
     del forecast_d02_data
-    an_times_d01 = pd.date_range(start=increment_time(model_initial_date, hours=6),
+    an_times_d01 = pd.date_range(start=increment_time(model_initial_date, hours=12),
                                  end=increment_time(model_initial_date, hours=24), freq='3H')
     previous_forecast_file_d01 = (wrf_param['dir_control'] + '/' +
                                   previous_forecast_time.strftime('%Y%m%d%H') +
@@ -338,7 +338,7 @@ stage4 = stage4.chunk(chunks=chunks_dataset)
 # Get subset for forecast to time of interest
 print('Finding analogues', flush=True)
 mp_an_idx = find_analogue([forecast['timestep_pcp'].sel(time=an_time),
-                           forecast['height'].sel(pressure=50000).isel(time=0),
+                           forecast['height'].sel(pressure=50000).sel(time=model_initial_date),
                            forecast['cape'].sel(time=(an_time - pd.Timedelta(hours=3)))],
                           [pcp_dataset, height_dataset_mp, cape_dataset])
 pbl_an_idx = find_analogue_precip_area([forecast['timestep_pcp'].sel(time=an_time),

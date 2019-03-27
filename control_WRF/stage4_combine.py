@@ -8,7 +8,6 @@
 #$ -e error_out
 #$ -P communitycluster
 #$ -q ancellcc
-#$ -pe sm 1
 
 # Script for combining StageIV precipitation files and regridding to project grid.
 #
@@ -19,25 +18,25 @@
 import numpy as np
 from netCDF4 import Dataset, date2num
 from datetime import datetime, timedelta
-import xarray as xr
+import pygrib
 from pyresample import geometry, image
 
 
-date1 = datetime(2016, 5, 1, 12)
-ref_date = datetime(2016, 1, 1, 00)
-enddate = datetime(2016, 6, 2, 12)
-outname_03h = '/lustre/scratch/twixtrom/ST4_201605_03h.nc'
-outname_01h = '/lustre/scratch/twixtrom/ST4_201605_01h.nc'
+date1 = datetime(2016, 7, 1, 15)
+ref_date = datetime(2016, 1, 1, 0)
+enddate = datetime(2016, 8, 2, 12)
+outname_03h = '/lustre/scratch/twixtrom/ST4_201607_03h.nc'
+outname_01h = '/lustre/scratch/twixtrom/ST4_201607_01h.nc'
 dtype = 'f4'
 
-print('Getting Obs Grid', flush=True)
+print('Getting Obs Grid')
 # Open a stageIV file and get out the grid
-grib = xr.open_dataset('/lustre/scratch/twixtrom/stage4/ST4.2016010112.01h', engine='cfgrib')
-obs_lat = grib.latitude.data
-obs_lon = grib.longitude.data
+grib = pygrib.open('/lustre/scratch/twixtrom/stage4/ST4.2016010112.01h')
+apcp = grib.read(1)[0]
+obs_lat, obs_lon = apcp.latlons()
 obs_grid = geometry.GridDefinition(lons=obs_lon, lats=obs_lat)
 
-print('Getting forecast grids', flush=True)
+print('Getting forecast grids')
 # Get the 12-km forecast grid
 fcst_12km = Dataset('/lustre/scratch/twixtrom/adaptive_wrf_post/control_thompson/2016010112/wrfprst_d01_2016010112.nc')
 fcst_lat_12km = fcst_12km.variables['lat'][0,]
@@ -51,7 +50,7 @@ fcst_lon_4km = fcst_4km.variables['lon'][0,]
 fcst_grid_4km = geometry.GridDefinition(lons=fcst_lon_4km, lats=fcst_lat_4km)
 
 
-print('Creating output files', flush=True)
+print('Creating output files')
 # Create the output files and dimensions
 outfile1 = Dataset(outname_01h, 'w')
 outfile2 = Dataset(outname_03h, 'w')
@@ -126,8 +125,8 @@ time_01h.units = time_unit
 # Get the observed precipitation for each day, regrid to forecast grid and save
 j = 0
 k = 0
-while date1 < enddate:
-    print('Processing Time: '+str(date1), flush=True)
+while date1 <= enddate:
+    print('Processing Time: '+str(date1))
     # open the thre 1-hour accumulation files
     time1 = date1 - timedelta(hours=2)
     file1 = '/lustre/scratch/twixtrom/stage4/ST4.'+time1.strftime('%Y%m%d%H')+'.01h'
@@ -139,31 +138,37 @@ while date1 < enddate:
     file3 = '/lustre/scratch/twixtrom/stage4/ST4.'+time3.strftime('%Y%m%d%H')+'.01h'
 
     # open the files and extract data
-    print('Opening file: '+file1, flush=True)
+    print('Opening file: '+file1)
     try:
-        grib1 = xr.open_dataset(file1, engine='cfgrib')
-        pcp1 = grib1.tp.data
+        grib1 = pygrib.open(file1)
+        apcp1 = grib1.read(1)[0]
+        pcp1 = apcp1.values.data
+        pcp1[apcp1.values.mask] = 0.
     except OSError:
-        print('File not found: '+file1, flush=True)
-        print('Setting nan field', flush=True)
+        print('File not found: '+file1)
+        print('Setting nan field')
         pcp1 = np.full_like(obs_lat, np.nan)
 
-    print('Opening file: '+file2, flush=True)
+    print('Opening file: '+file2)
     try:
-        grib2 = xr.open_dataset(file2, engine='cfgrib')
-        pcp2 = grib2.tp.data
+        grib2 = pygrib.open(file2)
+        apcp2 = grib2.read(1)[0]
+        pcp2 = apcp2.values.data
+        pcp2[apcp2.values.mask] = 0.
     except OSError:
-        print('File not found: '+file2, flush=True)
-        print('Setting nan field', flush=True)
+        print('File not found: '+file2)
+        print('Setting nan field')
         pcp2 = np.full_like(obs_lat, np.nan)
 
-    print('Opening file: '+file3, flush=True)
+    print('Opening file: '+file3)
     try:
-        grib3 = xr.open_dataset(file3, engine='cfgrib')
-        pcp3 = grib3.tp.data
+        grib3 = pygrib.open(file3)
+        apcp3 = grib3.read(1)[0]
+        pcp3 = apcp3.values.data
+        pcp3[apcp3.values.mask] = 0.
     except OSError:
-        print('File not found: '+file3, flush=True)
-        print('Setting nan field', flush=True)
+        print('File not found: '+file3)
+        print('Setting nan field')
         pcp3 = np.full_like(obs_lat, np.nan)
 
 
@@ -171,13 +176,13 @@ while date1 < enddate:
     tot_pcp = pcp1 + pcp2 + pcp3
 
     # regrid 3-hour total to forecast grid
-    print('Regridding 3-hr total precipitation', flush=True)
+    print('Regridding 3-hr total precipitation')
     resample_quick = image.ImageContainerNearest(tot_pcp, obs_grid, radius_of_influence=12000)
     resample_obs = resample_quick.resample(fcst_grid_12km)
     new_tot_pcp = resample_obs.image_data
 
     # write the 3-hour total to file
-    print('Writing to file: '+outname_03h, flush=True)
+    print('Writing to file: '+outname_03h)
     total_precipitation[k, :, :] = new_tot_pcp
 
     # write the time for the 3-hour precipitation
@@ -188,7 +193,7 @@ while date1 < enddate:
     time_obj = [time1, time2, time3]
 
     # regrib and write the hourly totals to file
-    print('Regridding 1-hr precipitation', flush=True)
+    print('Regridding 1-hr precipitation')
     for i in range(3):
         # regrid 1-hour total to forecast grid
         resample_quick = image.ImageContainerNearest(pcp_obj[i], obs_grid,
@@ -205,6 +210,6 @@ while date1 < enddate:
 
     k += 1
     date1 += timedelta(hours=3)
-    print('Writing to file: '+outname_01h, flush=True)
+    print('Writing to file: '+outname_01h)
 outfile1.close()
 outfile2.close()
