@@ -7,7 +7,6 @@
 #$ -pe sm 36
 #$ -P quanah
 #$ -t 1-62:1
-#$ -l h_rt=01:00:00
 
 # Array job script for running UPP/unipost for each member in an ensemble set
 #
@@ -15,14 +14,12 @@
 # Texas Tech University
 # 27 March 2018
 
-date1=2016050112
-
-if [ ${SGE_TASK_ID} -le 31 ]
-then
+date1=2016070112
+if [ ${SGE_TASK_ID} -le 31 ] ; then
     name='control_ETA'
     ndays=$(( $SGE_TASK_ID - 1 ))
 else
-    name='control_WRF2M'
+    name='control_thompson'
     ndays=$(( $SGE_TASK_ID - 32 ))
 fi
 

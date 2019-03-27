@@ -1,10 +1,10 @@
 from setuptools import setup
 
 setup(
-    name='Analogue Algorithm',
+    name='analogue_algorithm',
     version='0.1',
     packages=['analogue_algorithm'],
-    requires=['netcdf4', 'numpy', 'scipy', 'dask', 'xarray', 'pandas'],
+    requires=['netcdf4', 'numpy', 'scipy', 'dask', 'xarray', 'pandas', 'pyresample'],
     url='',
     license='BSD-3',
     author='Tyler Wixtrom',

@@ -28,11 +28,11 @@ from analogue_algorithm.calc import verify_members
 verif_param = {
     'forecast_hour': 12.,
     'threshold': 10.,
-    'sigma': 2,
-    'start_date': '2015-05-01T12:00:00',
-    'end_date': '2015-05-31T12:00:00',
+    'sigma': 1,
+    'start_date': '2015-07-01T12:00:00',
+    'end_date': '2015-08-01T12:00:00',
     'dt': '1D',
-    'fname': '/home/twixtrom/adaptive_WRF/best_members_may.txt',
+    'fname': '/home/twixtrom/adaptive_WRF/best_members_july.txt',
     'obsfile': '/lustre/work/twixtrom/ST4_2015_03h.nc'
     }
 chunks = None
@@ -49,10 +49,10 @@ for key in verif_param.keys():
 
 
 def open_pcp(hour, dx):
-    pcpfile = '/lustre/scratch/twixtrom/dataset_variables/' \
+    pcpfile = '/lustre/scratch/twixtrom/dataset_variables/temp/' \
               'adp_dataset_'+dx+'_timestep_pcp_f'+str(int(hour))+'.nc'
     precip = xr.open_dataset(pcpfile, chunks=chunks)
-    return precip.where(precip.time < np.datetime64('2016-01-01T12:00:00'), drop=True)
+    return precip  #.where(precip.time < np.datetime64('2016-01-01T12:00:00'), drop=True)
 
 
 pcp = open_pcp(verif_param['forecast_hour'], '12km')

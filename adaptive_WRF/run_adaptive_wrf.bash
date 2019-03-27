@@ -7,7 +7,7 @@
 #$ -q omni
 #$ -pe sm 36
 #$ -l h_rt=10:00:00
-#$ -t 1-2:1
+#$ -t 1-30:1
 
 #############################################################
 #
@@ -21,7 +21,9 @@ module load impi
 module load netcdf-serial
 
 python_exec=/home/twixtrom/miniconda3/envs/analogue/bin/python
-param=/home/twixtrom/adaptive_WRF/adaptive_WRF/adaptive_parameters.bash
+runscript=/home/twixtrom/adaptive_WRF/adaptive_WRF/run_adaptive_wrf.py
 ndays=$(( $SGE_TASK_ID - 1 ))
-
-${python_exec} ${ndays}
+#if [[ ${ndays} -eq 0 ]] ; then
+#    rm /home/twixtrom/adaptive_WRF/adaptive_WRF/an_selection_log_201605.log
+#fi
+${python_exec} ${runscript} ${ndays}

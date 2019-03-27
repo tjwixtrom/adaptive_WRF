@@ -17,7 +17,7 @@
 # 18 July 2018
 ##############################################################################################
 #thresholds=( 1 5 )
-#stdevs=( 2 5 )
+# stdevs=( 0.5 1 2 5 )
 #idxs=( {1..1}{0..1}{0..1} )
 domain=1
 ID=$(( $SGE_TASK_ID - 1 ))
@@ -52,9 +52,10 @@ methods=(
         "rmse_pcpT00+hgt500f00+capeT-3"
         )
 method=${methods[${ID}]}
-# method="rmse_pcpT00+dewptT00+mslpT00"
-save_dir=/lustre/work/twixtrom/analogue_analysis_final/f${an_fhour}/domain${domain}/${method}/${mslp_threshold}/
+sigma=1
+
+save_dir=/lustre/work/twixtrom/analogue_analysis_optimal/f${an_fhour}/${method}/
 mkdir -p ${save_dir}
-python_exec=/home/twixtrom/miniconda3/envs/research/bin/python
-runscript=/home/twixtrom/analogue_algorithm/calc_analogue.py
-${python_exec} ${runscript} ${domain} ${method} ${save_dir} ${an_fhour} ${pcp_threshold} ${cape_threshold} ${dewpt_threshold} ${height_threshold} ${mslp_threshold}
+python_exec=/home/twixtrom/miniconda3/envs/analogue/bin/python
+runscript=/home/twixtrom/adaptive_WRF/calc_analogue.py
+${python_exec} ${runscript} ${domain} ${method} ${save_dir} ${an_fhour} ${pcp_threshold} ${cape_threshold} ${dewpt_threshold} ${height_threshold} ${mslp_threshold} ${sigma}
