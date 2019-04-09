@@ -32,10 +32,11 @@ warnings.filterwarnings("ignore")
 # load_modules = subprocess.call('module load intel impi netcdf-serial', shell=True)
 
 # ndays = float(os.environ['SGE_TASK_ID']) - 1
-ndays = sys.argv[1]
+# ndays = sys.argv[1]
+datestr = sys.argv[1]
 # ndays = 0
 # Define initial period start date
-start_date = pd.Timestamp(2016, 7, 2, 12)
+# start_date = pd.Timestamp(2016, 1, 14, 12)
 # chunks_forecast = {'time': 1, 'pressure': 1}
 # chunks_dataset = {'time': 1}
 chunks_forecast = None
@@ -176,18 +177,19 @@ wrf_param['otime_nest'] = wrf_param['output_intervalNEST'] / 60.
 wrf_param['model_BC_interval'] = wrf_param['dlbc'] * 60.
 
 # Clear log if this is the first run
-if ndays == 0:
-    os.remove(analogue_param['logfile'])
+# if ndays == 0:
+#     os.remove(analogue_param['logfile'])
 
 # Find date and time of model start and end
-model_initial_date = increment_time(start_date, days=int(ndays))
+# model_initial_date = increment_time(start_date, days=int(ndays))
+model_initial_date = pd.Timestamp(datestr)
 model_end_date = increment_time(model_initial_date, hours=wrf_param['fct_len_hrs'])
 datep = increment_time(model_initial_date, hours=-1)
 print('Starting forecast for: ' + str(model_initial_date), flush=True)
 
 # Determine number of input metgrid levels
 # GFS changed from 27 to 32 on May 15, 2016
-if model_initial_date < pd.to_datetime('2016-05-12T12:00:00'):
+if model_initial_date < pd.to_datetime('2016-05-11T12:00:00'):
     wrf_param['num_metgrid_levels'] = 27
 else:
     wrf_param['num_metgrid_levels'] = 32
@@ -385,7 +387,37 @@ for date, member_list in zip([mp_an_date, pbl_an_date], [mp_list, pbl_list]):
         logfile.write(model_initial_date.strftime('%Y%m%d%H') + ', None, None, nan, nan\n')
         raise ValueError('Precipitation not found for analogue')
 
+if (members[1] == 'mem19') & (members[0] in ['mem2', 'mem4', 'mem5', 'mem6']):
+    date = pbl_an_date
+    an_verif_date = date + leadtime
+    fcst_smooth = xr.apply_ufunc(gaussian_filter, pcp_dataset['mean'].sel(time=date),
+                                 pcp_dataset.attrs['sigma'], dask='allowed')
+    obs = stage4.total_precipitation.sel(time=an_verif_date)
+    obs_smooth = xr.apply_ufunc(gaussian_filter, obs, analogue_param['sigma'],
+                                dask='allowed')
+    st4_an = obs.where(((obs_smooth >= analogue_param['pcp_threshold']) |
+                        (fcst_smooth >= analogue_param['pcp_threshold'])), drop=True)
 
+    # Find best member for analouge date by RMSE
+    # for MP members
+    an_rmse = []
+    pbl_mems = pbl_list.copy()
+    pbl_mems.remove('mem19')
+    for mem in pbl_mems:
+        mem_data = pcp_dataset[mem].sel(time=date).where(
+            ((fcst_smooth >= analogue_param['pcp_threshold']) |
+             (obs_smooth >= analogue_param['pcp_threshold'])), drop=True)
+        rmse_mem = rmse_dask(mem_data, st4_an)
+        an_rmse.append(rmse_mem)
+    with ProgressBar():
+        member_rmse = np.array(compute(*an_rmse))
+    try:
+        members[1] = pbl_mems[np.nanargmin(member_rmse)]
+    except ValueError:
+        logfile.write(model_initial_date.strftime('%Y%m%d%H') + ', None, None, nan, nan\n')
+        raise ValueError('Precipitation not found for analogue')
+
+# print(members)
 logfile.write(model_initial_date.strftime('%Y%m%d%H')+', '+domain+', '+leadtime_str+', '+str(members[0])+', '+str(members[1])+'\n')
 wrf_param['model_mp_phys'] = model_phys[members[0]][0]
 wrf_param['model_pbl_phys'] = model_phys[members[1]][1]
@@ -466,4 +498,4 @@ move_wrf_files_command = ('mv '+wrf_param['dir_run']+model_initial_date.strftime
                           model_initial_date.strftime('%Y%m%d%H') + '/wrfout_d02_' +
                           model_initial_date.strftime('%Y%m%d%H') + '.nc')
 subprocess.run(move_wrf_files_command, shell=True)
-print('Finished with forecast initialized: '+model_initial_date, flush=True)
+print('Finished with forecast initialized: '+str(model_initial_date), flush=True)
