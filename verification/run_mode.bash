@@ -21,14 +21,18 @@ date=`/home/twixtrom/adaptive_WRF/control_WRF/advance_time_python.py ${datem} ${
 
 for member in "control_thompson" "control_ETA" "adaptive_wrf"; do
 for domain in 1 2; do
-for fhour in 12 24 36; do
-
+for fhour in 12 18 24 36; do
 thresh=1
-radius=4
+#if [[ ${domain} -eq 1 ]]; then
+#    thresh=6
+#else
+#    thresh=2
+#fi
+radius=8
 area=0
 interest=0.7
 # make the output directory
-savedir=/lustre/scratch/twixtrom/adaptive_verif/${member}/${date}/${domain}/${fhour}
+savedir=/lustre/work/twixtrom/adaptive_verif/${member}/${date}/${domain}/${fhour}
 mkdir -p ${savedir}
 
 if [[ ${domain} -eq 1 ]]; then
