@@ -17,24 +17,24 @@
 # 22 January 2019
 #
 ##############################################################################################
-# import subprocess
-# import sys
-# import os
-# import glob
+import glob
 import operator
+import os
+import subprocess
 import warnings
-# from pathlib import Path
+from pathlib import Path
 
-from analogue_algorithm import (  # check_logs, concat_files, create_wrf_namelist,
-                                find_max_coverage, find_analogue,
-                                find_analogue_precip_area, increment_time, rmse_dask)
 import numpy as np
-from netCDF4 import num2date
 import pandas as pd
 import xarray as xr
-# from dask import compute
-# from dask.diagnostics import ProgressBar
-# from scipy.ndimage import gaussian_filter
+from dask import compute
+from dask.diagnostics import ProgressBar
+from netCDF4 import num2date
+from scipy.ndimage import gaussian_filter
+
+from analogue_algorithm import (check_logs, concat_files, create_wrf_namelist,
+                                find_analogue, find_analogue_precip_area,
+                                find_max_coverage, increment_time, rmse_dask)
 
 warnings.filterwarnings("ignore")
 
@@ -384,143 +384,143 @@ for model_initial_date in all_dates:
     print('MP analogue date selected: '+str(mp_an_date), flush=True)
     print('PBL analogue date selected: '+str(pbl_an_date), flush=True)
     logfile.write(str(np.datetime64(model_initial_date))+', '+str(np.array(mp_an_date))+', '+str(np.array(pbl_an_date))+'\n')
-# print('Finding Best Members', flush=True)
-# members = []
-# for date, member_list in zip([mp_an_date, pbl_an_date], [mp_list, pbl_list]):
-#     an_verif_date = date + leadtime
-#     fcst_smooth = xr.apply_ufunc(gaussian_filter, pcp_dataset['mean'].sel(time=date),
-#                                  pcp_dataset.attrs['sigma'], dask='allowed')
-#     obs = stage4.total_precipitation.sel(time=an_verif_date)
-#     obs_smooth = xr.apply_ufunc(gaussian_filter, obs, analogue_param['sigma'], dask='allowed')
-#     st4_an = obs.where(((obs_smooth >= analogue_param['pcp_threshold']) |
-#                         (fcst_smooth >= analogue_param['pcp_threshold'])), drop=True)
-#
-#     # Find best member for analouge date by RMSE
-#     # for MP members
-#     an_rmse = []
-#     for mem in member_list:
-#         mem_data = pcp_dataset[mem].sel(time=date).where(
-#             ((fcst_smooth >= analogue_param['pcp_threshold']) |
-#              (obs_smooth >= analogue_param['pcp_threshold'])), drop=True)
-#         rmse_mem = rmse_dask(mem_data, st4_an)
-#         an_rmse.append(rmse_mem)
-#     with ProgressBar():
-#         member_rmse = np.array(compute(*an_rmse))
-#     try:
-#         members.append(member_list[np.nanargmin(member_rmse)])
-#     except ValueError:
-#         logfile.write(model_initial_date.strftime('%Y%m%d%H') + ', None, None, nan, nan\n')
-#         raise ValueError('Precipitation not found for analogue')
-#
-# if (members[1] == 'mem19') & (members[0] in ['mem2', 'mem4', 'mem5', 'mem6']):
-#     date = pbl_an_date
-#     an_verif_date = date + leadtime
-#     fcst_smooth = xr.apply_ufunc(gaussian_filter, pcp_dataset['mean'].sel(time=date),
-#                                  pcp_dataset.attrs['sigma'], dask='allowed')
-#     obs = stage4.total_precipitation.sel(time=an_verif_date)
-#     obs_smooth = xr.apply_ufunc(gaussian_filter, obs, analogue_param['sigma'],
-#                                 dask='allowed')
-#     st4_an = obs.where(((obs_smooth >= analogue_param['pcp_threshold']) |
-#                         (fcst_smooth >= analogue_param['pcp_threshold'])), drop=True)
-#
-#     # Find best member for analouge date by RMSE
-#     # for MP members
-#     an_rmse = []
-#     pbl_mems = pbl_list.copy()
-#     pbl_mems.remove('mem19')
-#     for mem in pbl_mems:
-#         mem_data = pcp_dataset[mem].sel(time=date).where(
-#             ((fcst_smooth >= analogue_param['pcp_threshold']) |
-#              (obs_smooth >= analogue_param['pcp_threshold'])), drop=True)
-#         rmse_mem = rmse_dask(mem_data, st4_an)
-#         an_rmse.append(rmse_mem)
-#     with ProgressBar():
-#         member_rmse = np.array(compute(*an_rmse))
-#     try:
-#         members[1] = pbl_mems[np.nanargmin(member_rmse)]
-#     except ValueError:
-#         logfile.write(model_initial_date.strftime('%Y%m%d%H') + ', None, None, nan, nan\n')
-#         raise ValueError('Precipitation not found for analogue')
+print('Finding Best Members', flush=True)
+members = []
+for date, member_list in zip([mp_an_date, pbl_an_date], [mp_list, pbl_list]):
+    an_verif_date = date + leadtime
+    fcst_smooth = xr.apply_ufunc(gaussian_filter, pcp_dataset['mean'].sel(time=date),
+                                 pcp_dataset.attrs['sigma'], dask='allowed')
+    obs = stage4.total_precipitation.sel(time=an_verif_date)
+    obs_smooth = xr.apply_ufunc(gaussian_filter, obs, analogue_param['sigma'], dask='allowed')
+    st4_an = obs.where(((obs_smooth >= analogue_param['pcp_threshold']) |
+                        (fcst_smooth >= analogue_param['pcp_threshold'])), drop=True)
 
-# print(members)
-# logfile.write(model_initial_date.strftime('%Y%m%d%H')+', '+domain+', '+leadtime_str+', '+str(members[0])+', '+str(members[1])+'\n')
-# wrf_param['model_mp_phys'] = model_phys[members[0]][0]
-# wrf_param['model_pbl_phys'] = model_phys[members[1]][1]
-# wrf_param['model_sfclay_phys'] = model_phys[members[1]][2]
-#
-# # Create the save directory
-# save_dir = wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')
-# Path(save_dir).mkdir(parents=True, exist_ok=True)
-#
-# # Remove any existing namelist
-# try:
-#     os.remove(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'namelist.input')
-# except FileNotFoundError:
-#     pass
-#
-# # Generate namelist
-# namelist = wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/namelist.input'
-# print('Creating namelist.input as: '+namelist, flush=True)
-# create_wrf_namelist(namelist, wrf_param, model_initial_date)
-#
-# # Remove any existing wrfout files
-# for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/wrfout*'):
-#     os.remove(file)
-#
-# # Call mpi for real.exe
-# print('Running real.exe', flush=True)
-# run_real_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
-#                     ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
-#                     model_initial_date.strftime('%Y%m%d%H')+'/real.exe')
-# real = subprocess.call(run_real_command, shell=True)
-#
-# # Combine log files into single log
-# concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
-#              (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
-#              model_initial_date.strftime('%Y%m%d%H')+'.log'))
-#
-# # Remove the logs
-# for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
-#     os.remove(file)
-#
-# # Check for successful completion
-# check_logs(wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
-#            model_initial_date.strftime('%Y%m%d%H')+'.log',
-#            wrf_param['dir_sub']+wrf_param['check_log'], model_initial_date)
-#
-# # Call mpi for wrf.exe
-# print('Running wrf.exe', flush=True)
-# run_wrf_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
-#                    ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
-#                    model_initial_date.strftime('%Y%m%d%H')+'/wrf.exe')
-# wrf = subprocess.call(run_wrf_command, shell=True)
-# # wrf.wait()
-#
-# # Combine log files into single log
-# print('Moving log files', flush=True)
-# concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
-#              (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
-#              model_initial_date.strftime('%Y%m%d%H')+'.log'))
-#
-# # Remove the logs
-# for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
-#     os.remove(file)
-#
-# # Check for successful completion
-# check_logs(wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
-#            model_initial_date.strftime('%Y%m%d%H')+'.log',
-#            wrf_param['dir_sub']+wrf_param['check_log'], model_initial_date, wrf=True)
-#
-# # Move wrfout files to storage
-# print('Moving output', flush=True)
-# move_wrf_files_command = ('mv '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+
-#                           '/wrfout_d01* '+wrf_param['dir_store']+
-#                           model_initial_date.strftime('%Y%m%d%H')+'/wrfout_d01_' +
-#                           model_initial_date.strftime('%Y%m%d%H')+'.nc && '
-#                           'mv ' + wrf_param['dir_run'] +
-#                           model_initial_date.strftime('%Y%m%d%H') +
-#                           '/wrfout_d02* ' + wrf_param['dir_store'] +
-#                           model_initial_date.strftime('%Y%m%d%H') + '/wrfout_d02_' +
-#                           model_initial_date.strftime('%Y%m%d%H') + '.nc')
-# subprocess.run(move_wrf_files_command, shell=True)
-# print('Finished with forecast initialized: '+str(model_initial_date), flush=True)
+    # Find best member for analouge date by RMSE
+    # for MP members
+    an_rmse = []
+    for mem in member_list:
+        mem_data = pcp_dataset[mem].sel(time=date).where(
+            ((fcst_smooth >= analogue_param['pcp_threshold']) |
+             (obs_smooth >= analogue_param['pcp_threshold'])), drop=True)
+        rmse_mem = rmse_dask(mem_data, st4_an)
+        an_rmse.append(rmse_mem)
+    with ProgressBar():
+        member_rmse = np.array(compute(*an_rmse))
+    try:
+        members.append(member_list[np.nanargmin(member_rmse)])
+    except ValueError:
+        logfile.write(model_initial_date.strftime('%Y%m%d%H') + ', None, None, nan, nan\n')
+        raise ValueError('Precipitation not found for analogue')
+
+if (members[1] == 'mem19') & (members[0] in ['mem2', 'mem4', 'mem5', 'mem6']):
+    date = pbl_an_date
+    an_verif_date = date + leadtime
+    fcst_smooth = xr.apply_ufunc(gaussian_filter, pcp_dataset['mean'].sel(time=date),
+                                 pcp_dataset.attrs['sigma'], dask='allowed')
+    obs = stage4.total_precipitation.sel(time=an_verif_date)
+    obs_smooth = xr.apply_ufunc(gaussian_filter, obs, analogue_param['sigma'],
+                                dask='allowed')
+    st4_an = obs.where(((obs_smooth >= analogue_param['pcp_threshold']) |
+                        (fcst_smooth >= analogue_param['pcp_threshold'])), drop=True)
+
+    # Find best member for analouge date by RMSE
+    # for MP members
+    an_rmse = []
+    pbl_mems = pbl_list.copy()
+    pbl_mems.remove('mem19')
+    for mem in pbl_mems:
+        mem_data = pcp_dataset[mem].sel(time=date).where(
+            ((fcst_smooth >= analogue_param['pcp_threshold']) |
+             (obs_smooth >= analogue_param['pcp_threshold'])), drop=True)
+        rmse_mem = rmse_dask(mem_data, st4_an)
+        an_rmse.append(rmse_mem)
+    with ProgressBar():
+        member_rmse = np.array(compute(*an_rmse))
+    try:
+        members[1] = pbl_mems[np.nanargmin(member_rmse)]
+    except ValueError:
+        logfile.write(model_initial_date.strftime('%Y%m%d%H') + ', None, None, nan, nan\n')
+        raise ValueError('Precipitation not found for analogue')
+
+print(members)
+logfile.write(model_initial_date.strftime('%Y%m%d%H')+', '+domain+', '+leadtime_str+', '+str(members[0])+', '+str(members[1])+'\n')
+wrf_param['model_mp_phys'] = model_phys[members[0]][0]
+wrf_param['model_pbl_phys'] = model_phys[members[1]][1]
+wrf_param['model_sfclay_phys'] = model_phys[members[1]][2]
+
+# Create the save directory
+save_dir = wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')
+Path(save_dir).mkdir(parents=True, exist_ok=True)
+
+# Remove any existing namelist
+try:
+    os.remove(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'namelist.input')
+except FileNotFoundError:
+    pass
+
+# Generate namelist
+namelist = wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/namelist.input'
+print('Creating namelist.input as: '+namelist, flush=True)
+create_wrf_namelist(namelist, wrf_param, model_initial_date)
+
+# Remove any existing wrfout files
+for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/wrfout*'):
+    os.remove(file)
+
+# Call mpi for real.exe
+print('Running real.exe', flush=True)
+run_real_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
+                    ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
+                    model_initial_date.strftime('%Y%m%d%H')+'/real.exe')
+real = subprocess.call(run_real_command, shell=True)
+
+# Combine log files into single log
+concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
+             (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
+             model_initial_date.strftime('%Y%m%d%H')+'.log'))
+
+# Remove the logs
+for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
+    os.remove(file)
+
+# Check for successful completion
+check_logs(wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_real_' +
+           model_initial_date.strftime('%Y%m%d%H')+'.log',
+           wrf_param['dir_sub']+wrf_param['check_log'], model_initial_date)
+
+# Call mpi for wrf.exe
+print('Running wrf.exe', flush=True)
+run_wrf_command = ('cd '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H') +
+                   ' && mpirun -np '+str(wrf_param['norm_cores'])+' '+wrf_param['dir_run']+
+                   model_initial_date.strftime('%Y%m%d%H')+'/wrf.exe')
+wrf = subprocess.call(run_wrf_command, shell=True)
+# wrf.wait()
+
+# Combine log files into single log
+print('Moving log files', flush=True)
+concat_files((wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'),
+             (wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
+             model_initial_date.strftime('%Y%m%d%H')+'.log'))
+
+# Remove the logs
+for file in glob.glob(wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+'/rsl.*'):
+    os.remove(file)
+
+# Check for successful completion
+check_logs(wrf_param['dir_store']+model_initial_date.strftime('%Y%m%d%H')+'/rslout_wrf_' +
+           model_initial_date.strftime('%Y%m%d%H')+'.log',
+           wrf_param['dir_sub']+wrf_param['check_log'], model_initial_date, wrf=True)
+
+# Move wrfout files to storage
+print('Moving output', flush=True)
+move_wrf_files_command = ('mv '+wrf_param['dir_run']+model_initial_date.strftime('%Y%m%d%H')+
+                          '/wrfout_d01* '+wrf_param['dir_store']+
+                          model_initial_date.strftime('%Y%m%d%H')+'/wrfout_d01_' +
+                          model_initial_date.strftime('%Y%m%d%H')+'.nc && '
+                          'mv ' + wrf_param['dir_run'] +
+                          model_initial_date.strftime('%Y%m%d%H') +
+                          '/wrfout_d02* ' + wrf_param['dir_store'] +
+                          model_initial_date.strftime('%Y%m%d%H') + '/wrfout_d02_' +
+                          model_initial_date.strftime('%Y%m%d%H') + '.nc')
+subprocess.run(move_wrf_files_command, shell=True)
+print('Finished with forecast initialized: '+str(model_initial_date), flush=True)
