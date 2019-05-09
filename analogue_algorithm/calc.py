@@ -95,7 +95,9 @@ def find_analogue(forecast, dataset, mean=False):
         fcst_masked = forecast_var.where(operator(fcst_smooth, threshold), drop=True)
 
         # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-        dataset_mean = data_var['mean']
+        # dataset_mean = data_var['mean']
+        # Use Thompson+YSU for comparison instead of mean
+        dataset_mean = data_var['mem1']
         dataset_mean_masked = dataset_mean.where(operator(fcst_smooth, threshold), drop=True)
         # Actually find the index of the closest analogue
         argscore.append(rmse_dask(dataset_mean_masked, fcst_masked, axis=(-2, -1)))
@@ -219,7 +221,9 @@ def find_analogue_precip_area(forecast, dataset):
         fcst_masked = fcst.where(operator(fcst_smooth, threshold), drop=True)
 
         # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-        dataset_mean = data['mean'].where(operator(fcst_smooth, threshold), drop=True)
+        # dataset_mean = data['mean'].where(operator(fcst_smooth, threshold), drop=True)
+        # Use Thompson+YSU instead of mean for analogue selection
+        dataset_mean = data['mem1'].where(operator(fcst_smooth, threshold), drop=True)
 
         # Actually find the index of the closest analogue
         argscore.append(rmse_dask(dataset_mean, fcst_masked, axis=(-2, -1)))
