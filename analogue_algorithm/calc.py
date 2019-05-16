@@ -36,7 +36,8 @@ def rmse_dask(predictions, targets, axis=None, nan=False):
     if nan:
         rmse_data = np.sqrt(np.mean(((predictions - targets) ** 2), axis=axis))
     else:
-        rmse_data = np.sqrt(np.nanmean(((predictions - targets) ** 2), axis=axis))
+        rmse_data = np.sqrt(np.nanmean(
+            ((predictions - targets) ** 2), axis=axis))
     return rmse_data
 
 
@@ -57,7 +58,8 @@ def rmse(predictions, targets, axis=None, nan=False):
     if nan:
         rmse_data = np.sqrt(np.mean(((predictions - targets) ** 2), axis=axis))
     else:
-        rmse_data = np.sqrt(np.nanmean(((predictions - targets) ** 2), axis=axis))
+        rmse_data = np.sqrt(np.nanmean(
+            ((predictions - targets) ** 2), axis=axis))
     return rmse_data
 
 # def rmse_xarray(predictions, targets, axis=None, nan=False):
@@ -90,15 +92,21 @@ def find_analogue(forecast, dataset, mean=False):
         threshold = data_var.threshold
 
         # Smooth and mask forecast mean
-        fcst_smooth = xr.apply_ufunc(gaussian_filter, forecast_var, sigma, dask='allowed')
+        fcst_smooth = xr.apply_ufunc(
+            gaussian_filter, forecast_var, sigma, dask='allowed')
         operator = data_var.operator
-        fcst_masked = forecast_var.where(operator(fcst_smooth, threshold), drop=True)
+        fcst_masked = forecast_var.where(
+            operator(fcst_smooth, threshold), drop=True)
 
         # mask the mean, subset for up to current date, find closest analogues by mean RMSE
         dataset_mean = data_var['mean']
-        dataset_mean_masked = dataset_mean.where(operator(fcst_smooth, threshold), drop=True)
+        # Use Thompson+YSU for comparison instead of mean
+        # dataset_mean = data_var['mem1']
+        dataset_mean_masked = dataset_mean.where(
+            operator(fcst_smooth, threshold), drop=True)
         # Actually find the index of the closest analogue
-        argscore.append(rmse_dask(dataset_mean_masked, fcst_masked, axis=(-2, -1)))
+        argscore.append(rmse_dask(dataset_mean_masked,
+                                  fcst_masked, axis=(-2, -1)))
 
     with ProgressBar():
         for arg in dask.compute(*argscore):
@@ -148,14 +156,14 @@ def verify_members(dataset, observations, parameters, mem_list):
             fcst_smooth = gaussian_filter(dataset[mem].sel(time=date),
                                           parameters['sigma'])
             mem_data = dataset[mem].sel(
-                                        time=date
-                                        ).where(
-                                        ((obs_smooth >= parameters['threshold']) |
-                                         (fcst_smooth >= parameters['threshold']))
-                                        )
+                time=date
+            ).where(
+                ((obs_smooth >= parameters['threshold']) |
+                 (fcst_smooth >= parameters['threshold']))
+            )
             obs_data_points = obs_data.where(
-                           ((obs_smooth >= parameters['threshold']) |
-                            (fcst_smooth >= parameters['threshold'])))
+                ((obs_smooth >= parameters['threshold']) |
+                 (fcst_smooth >= parameters['threshold'])))
             error = rmse(mem_data.values, obs_data_points.values)
             if np.isnan(error):
                 error = 0.
@@ -211,7 +219,8 @@ def find_analogue_precip_area(forecast, dataset):
     threshold = dataset[0].threshold
     score = np.zeros(dataset[0].time.shape[0])
     # Smooth and mask forecast mean
-    fcst_smooth = xr.apply_ufunc(gaussian_filter, forecast[0], sigma, dask='allowed')
+    fcst_smooth = xr.apply_ufunc(
+        gaussian_filter, forecast[0], sigma, dask='allowed')
     operator = dataset[0].operator
     argscore = []
     for fcst, data in zip(forecast, dataset):
@@ -219,7 +228,10 @@ def find_analogue_precip_area(forecast, dataset):
         fcst_masked = fcst.where(operator(fcst_smooth, threshold), drop=True)
 
         # mask the mean, subset for up to current date, find closest analogues by mean RMSE
-        dataset_mean = data['mean'].where(operator(fcst_smooth, threshold), drop=True)
+        dataset_mean = data['mean'].where(
+            operator(fcst_smooth, threshold), drop=True)
+        # Use Thompson+YSU instead of mean for analogue selection
+        # dataset_mean = data['mem1'].where(operator(fcst_smooth, threshold), drop=True)
 
         # Actually find the index of the closest analogue
         argscore.append(rmse_dask(dataset_mean, fcst_masked, axis=(-2, -1)))
