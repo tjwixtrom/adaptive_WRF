@@ -19,9 +19,9 @@ n=$(( ${SGE_TASK_ID} - 1 ))
 
 date=`/home/twixtrom/adaptive_WRF/control_WRF/advance_time_python.py ${datem} ${n} 0`
 
-for member in "control_thompson" "control_ETA" "adaptive_wrf"; do
+for member in "adaptive_wrf_new"; do
 for domain in 1 2; do
-for fhour in 12 18 24 36; do
+for fhour in 12 24 36; do
 thresh=1
 #if [[ ${domain} -eq 1 ]]; then
 #    thresh=6
