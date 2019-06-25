@@ -20,8 +20,8 @@
 import sys
 import warnings
 
-import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
+# import matplotlib.dates as mdates
+# import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -34,7 +34,7 @@ from analogue_algorithm.calc import rmse, find_analogue, find_analogue_precip_ar
 from analogue_algorithm.plots import plot_panels
 
 warnings.filterwarnings("ignore")
-plt.switch_backend('agg')
+# plt.switch_backend('agg')
 
 chunks = None
 param = {
@@ -59,8 +59,8 @@ param = {
     'an_start_date': '2015-10-01T12:00:00',
     'an_end_date': '2015-12-29T12:00:00',
     'dt': '1D',
-    'comments': 'Method testing for mslp threshold sensitivity',
-    'dataset_dir': '/lustre/scratch/twixtrom/dataset_variables/'
+    'comments': 'Optimal threshold after fixing incorrect comparison code',
+    'dataset_dir': '/lustre/scratch/twixtrom/dataset_variables/temp/'
     }
 
 verif_param = {
@@ -111,9 +111,9 @@ def open_pcp(hour, domain, dx):
     precip.attrs['threshold'] = param['pcp_threshold']
     precip.attrs['sigma'] = param['sigma']
     precip.attrs['operator'] = param['pcp_operator']
-    fcst_mean = xr.concat([precip[mem] for mem in mem_list],
-                          dim='Member').mean(dim='Member')
-    precip['mean'] = fcst_mean
+    # fcst_mean = xr.concat([precip[mem] for mem in mem_list],
+    #                       dim='Member').mean(dim='Member')
+    # precip['mean'] = fcst_mean
     return precip.where(precip.time < np.datetime64('2016-01-01T12:00:00'), drop=True)
 
 
@@ -123,9 +123,9 @@ def open_dewpt(hour, domain, dx):
     dew.attrs['threshold'] = param['dewpt_threshold']
     dew.attrs['sigma'] = param['sigma']
     dew.attrs['operator'] = param['dewpt_operator']
-    dew_mean = xr.concat([dew[mem] for mem in mem_list],
-                         dim='Member').mean(dim='Member')
-    dew['mean'] = dew_mean
+    # dew_mean = xr.concat([dew[mem] for mem in mem_list],
+    #                      dim='Member').mean(dim='Member')
+    # dew['mean'] = dew_mean
     return dew
 
 
@@ -135,9 +135,9 @@ def open_mslp(hour, domain, dx):
     slp.attrs['threshold'] = param['mslp_threshold']
     slp.attrs['sigma'] = param['sigma']
     slp.attrs['operator'] = param['mslp_operator']
-    slp_mean = xr.concat([slp[mem] for mem in mem_list],
-                         dim='Member').mean(dim='Member')
-    slp['mean'] = slp_mean
+    # slp_mean = xr.concat([slp[mem] for mem in mem_list],
+    #                      dim='Member').mean(dim='Member')
+    # slp['mean'] = slp_mean
     return slp
 
 
@@ -147,9 +147,9 @@ def open_cape(hour, domain, dx):
     cape.attrs['threshold'] = param['cape_threshold']
     cape.attrs['sigma'] = param['sigma']
     cape.attrs['operator'] = param['cape_operator']
-    cape_mean = xr.concat([cape[mem] for mem in mem_list],
-                          dim='Member').mean(dim='Member')
-    cape['mean'] = cape_mean
+    # cape_mean = xr.concat([cape[mem] for mem in mem_list],
+    #                       dim='Member').mean(dim='Member')
+    # cape['mean'] = cape_mean
     return cape
 
 
@@ -159,9 +159,9 @@ def open_temp(hour, domain, dx):
     temp_2m.attrs['threshold'] = param['temp_2m_threshold']
     temp_2m.attrs['sigma'] = param['sigma']
     temp_2m.attrs['operator'] = param['temp_2m_operator']
-    temp_2m_mean = xr.concat([temp_2m[mem] for mem in mem_list],
-                             dim='Member').mean(dim='Member')
-    temp_2m['mean'] = temp_2m_mean
+    # temp_2m_mean = xr.concat([temp_2m[mem] for mem in mem_list],
+    #                          dim='Member').mean(dim='Member')
+    # temp_2m['mean'] = temp_2m_mean
     return temp_2m
 
 
@@ -171,9 +171,9 @@ def open_height(hour, domain, dx):
     height_500hPa.attrs['threshold'] = param['height_500hPa_threshold']
     height_500hPa.attrs['sigma'] = param['sigma']
     height_500hPa.attrs['operator'] = param['height_500hPa_operator']
-    height_500hPa_mean = xr.concat([height_500hPa[mem] for mem in mem_list],
-                                   dim='Member').mean(dim='Member')
-    height_500hPa['mean'] = height_500hPa_mean
+    # height_500hPa_mean = xr.concat([height_500hPa[mem] for mem in mem_list],
+    #                                dim='Member').mean(dim='Member')
+    # height_500hPa['mean'] = height_500hPa_mean
     return height_500hPa
 
 
@@ -211,9 +211,9 @@ elif param['method'] == 'pcp_area_rmse_pcpT00+dewptf00+mslpf00':
     pcp = open_pcp(param['forecast_hour'], dom, dx)
     dewpt = open_dewpt(0, dom, dx)
     mslp = open_mslp(0, dom, dx)
-elif param['method'] == 'pcp_area_rmse_pcpT00+temp_2mT00':
-    pcp = open_pcp(param['forecast_hour'], dom, dx)
-    temp = open_temp(param['forecast_hour'], dom, dx)
+# elif param['method'] == 'pcp_area_rmse_pcpT00+temp_2mT00':
+#     pcp = open_pcp(param['forecast_hour'], dom, dx)
+#     temp = open_temp(param['forecast_hour'], dom, dx)
 elif param['method'] == 'pcp_area_rmse_pcpT00+height_500hPaT00':
     pcp = open_pcp(param['forecast_hour'], dom, dx)
     height = open_height(param['forecast_hour'], dom, dx)
@@ -225,9 +225,9 @@ elif param['method'] == 'rmse_pcpT00+hgt500f00+capeT-3':
     pcp = open_pcp(param['forecast_hour'], dom, dx)
     height = open_height(0, dom, dx)
     cape = open_cape((param['forecast_hour'] - 3), dom, dx)
-elif param['method'] == 'rmse_pcpT00+capeT-1':
-    pcp = open_pcp(param['forecast_hour'], dom, dx)
-    cape = open_cape((param['forecast_hour'] - 1), dom, dx)
+# elif param['method'] == 'rmse_pcpT00+capeT-1':
+#     pcp = open_pcp(param['forecast_hour'], dom, dx)
+#     cape = open_cape((param['forecast_hour'] - 1), dom, dx)
 else:
     raise ValueError('Method not defined')
 
@@ -247,36 +247,99 @@ dates = pd.date_range(start=param['an_start_date'],
 
 for date in dates:
     print('Starting date '+str(date), flush=True)
+    dataset_dates = pd.date_range(start=param['start_date'],
+                                  end=(date - pd.Timedelta(hours=24)),
+                                  freq=param['dt'])
     if param['method'] == 'rmse_pcpT00':
-        an_idx = find_analogue(date, pcp)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        an_idx = find_analogue([fpcp], [dpcp])
     elif param['method'] == 'rmse_pcpT00+dewptT00':
-        an_idx = find_analogue(date, pcp, dewpt)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fdewpt = dewpt['mean'].sel(time=date)
+        ddewpt = dewpt.sel(time=dataset_dates)
+        an_idx = find_analogue([fpcp, fdewpt], [dpcp, ddewpt])
     elif param['method'] == 'rmse_pcpT00+dewptT00+mslpT00':
-        an_idx = find_analogue(date, pcp, dewpt, mslp)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fmslp = mslp['mean'].sel(time=date)
+        dmslp = mslp.sel(time=dataset_dates)
+        an_idx = find_analogue([fpcp, fmslp], [dpcp, dmslp])
     elif param['method'] == 'rmse_pcpT00+dewptf00':
-        an_idx = find_analogue(date, pcp, dewpt)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fdewpt = dewpt['mean'].sel(time=date)
+        ddewpt = dewpt.sel(time=dataset_dates)
+        an_idx = find_analogue([fpcp, fdewpt], [dpcp, ddewpt])
     elif param['method'] == 'rmse_pcpT00+dewptf00+mslpf00':
-        an_idx = find_analogue(date, pcp, dewpt, mslp)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fdewpt = dewpt['mean'].sel(time=date)
+        ddewpt = dewpt.sel(time=dataset_dates)
+        fmslp = mslp['mean'].sel(time=date)
+        dmslp = mslp.sel(time=dataset_dates)
+        an_idx = find_analogue([fpcp, fdewpt, fmslp], [dpcp, ddewpt, dmslp])
     elif param['method'] == 'rmse_pcpT00+capeT-3':
-        an_idx = find_analogue(date, pcp, cape)
-    elif param['method'] == 'rmse_pcpT00+capeT-1':
-        an_idx = find_analogue(date, pcp, cape)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fcape = cape['mean'].sel(time=date)
+        dcape = cape.sel(time=dataset_dates)
+        an_idx = find_analogue([fpcp, fcape], [dpcp, dcape])
+    # elif param['method'] == 'rmse_pcpT00+capeT-1':
+    #     an_idx = find_analogue(date, pcp, cape)
     elif param['method'] == 'rmse_pcpT00+dewptT-3':
-        an_idx = find_analogue(date, pcp, dewpt)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fdewpt = dewpt['mean'].sel(time=date)
+        ddewpt = dewpt.sel(time=dataset_dates)
+        an_idx = find_analogue([fpcp, fdewpt], [dpcp, ddewpt])
     elif param['method'] == 'pcp_area_rmse_pcpT00+dewptT-3':
-        an_idx = find_analogue_precip_area(date, pcp, dewpt)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fdewpt = dewpt['mean'].sel(time=date)
+        ddewpt = dewpt.sel(time=dataset_dates)
+        an_idx = find_analogue_precip_area([fpcp, fdewpt], [dpcp, ddewpt])
     elif param['method'] == 'pcp_area_rmse_pcpT00+dewptT-3+mslpT-3':
-        an_idx = find_analogue_precip_area(date, pcp, dewpt, mslp)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fdewpt = dewpt['mean'].sel(time=date)
+        ddewpt = dewpt.sel(time=dataset_dates)
+        fmslp = mslp['mean'].sel(time=date)
+        dmslp = mslp.sel(time=dataset_dates)
+        an_idx = find_analogue_precip_area([fpcp, fdewpt, fmslp], [dpcp, ddewpt, dmslp])
     elif param['method'] == 'pcp_area_rmse_pcpT00+dewptf00+mslpf00':
-        an_idx = find_analogue_precip_area(date, pcp, dewpt, mslp)
-    elif param['method'] == 'pcp_area_rmse_pcpT00+temp_2mT00':
-        an_idx = find_analogue_precip_area(date, pcp, temp)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fdewpt = dewpt['mean'].sel(time=date)
+        ddewpt = dewpt.sel(time=dataset_dates)
+        fmslp = mslp['mean'].sel(time=date)
+        dmslp = mslp.sel(time=dataset_dates)
+        an_idx = find_analogue_precip_area([fpcp, fdewpt, fmslp], [dpcp, ddewpt, dmslp])
+    # elif param['method'] == 'pcp_area_rmse_pcpT00+temp_2mT00':
+    #     an_idx = find_analogue_precip_area(date, pcp, temp)
     elif param['method'] == 'pcp_area_rmse_pcpT00+height_500hPaT00':
-        an_idx = find_analogue_precip_area(date, pcp, height)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fheight = height['mean'].sel(time=date)
+        dheight = height.sel(time=dataset_dates)
+        an_idx = find_analogue_precip_area([fpcp, fheight], [dpcp, dheight])
     elif param['method'] == 'pcp_area_rmse_pcpT00+hgt500f00+capeT-3':
-        an_idx = find_analogue_precip_area(date, pcp, height, cape)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fheight = height['mean'].sel(time=date)
+        dheight = height.sel(time=dataset_dates)
+        fcape = cape['mean'].sel(time=date)
+        dcape = cape.sel(time=dataset_dates)
+        an_idx = find_analogue_precip_area([fpcp, fheight, fcape], [dpcp, dheight, dcape])
     elif param['method'] == 'rmse_pcpT00+hgt500f00+capeT-3':
-        an_idx = find_analogue(date, pcp, height, cape)
+        fpcp = pcp['mean'].sel(time=date)
+        dpcp = pcp.sel(time=dataset_dates)
+        fheight = height['mean'].sel(time=date)
+        dheight = height.sel(time=dataset_dates)
+        fcape = cape['mean'].sel(time=date)
+        dcape = cape.sel(time=dataset_dates)
+        an_idx = find_analogue([fpcp, fheight, fcape], [dpcp, dheight, dcape])
     # elif param['method'] == 'rmse_pcpf36+hgt500f00+capef33':
     #     an_idx = find_analogue(date, pcp, height, cape)
     # elif param['method'] == 'rmse_pcpf36+capef33':
@@ -414,47 +477,47 @@ for case in an_best_pbl:
 an_pbl = [case[0] for case in an_best_pbl]
 an_mp = [case[0] for case in an_best_mp]
 
-print('Generating Histograms', flush=True)
-xlab = 'Member'
-ylab = 'Selected Frequency'
-ax, ax2 = plot_panels((16, 16), (2, 2), 2,
-                      grid=True,
-                      x_labels=[xlab],
-                      y_labels=[ylab],
-                      ylim=(0, 30))
-ax.hist(an_mp, bins=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        range=(0, 10), facecolor='green', align='left', rwidth=0.5)
-ax.set_title('Histogram of Observed Analogue MP Scheme Selection for ' +
-             param['method']+' Method')
-
-ax2.hist(an_pbl, bins=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-         range=(0, 10), facecolor='orange', align='left', rwidth=0.3)
-ax2.set_title('Histogram of Observed Analogue PBL Scheme Selection'+param['method']+' Method')
-# plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
-#             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
-#             '_mem_selection.png')
-plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_mem_selection.png')
-
-xlab = 'Ranking'
-ylab = 'Observed Frequency'
-ticks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-ax, ax2 = plot_panels((16, 16), (2, 2), 2,
-                      grid=True,
-                      x_labels=[xlab],
-                      y_labels=[ylab],
-                      ylim=(0, 20))
-ax.hist(np.array(mp_ranks) + 1, bins=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        range=(0, 10), facecolor='green', align='left', rwidth=0.4)
-ax.set_title('Histogram of Observed Analogue MP Member Ranking '+param['method']+' Method')
-ax.set_xticks(ticks)
-ax2.hist(np.array(pbl_ranks) + 1, bins=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-         range=(0, 10), facecolor='orange', align='left', rwidth=0.5)
-ax2.set_title('Histogram of Observed Analogue PBL Member Ranking'+param['method']+' Method')
-ax2.set_xticks(ticks)
-# plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
-#             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
-#             '_ranks.png')
-plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_ranks.png')
+# print('Generating Histograms', flush=True)
+# xlab = 'Member'
+# ylab = 'Selected Frequency'
+# ax, ax2 = plot_panels((16, 16), (2, 2), 2,
+#                       grid=True,
+#                       x_labels=[xlab],
+#                       y_labels=[ylab],
+#                       ylim=(0, 30))
+# ax.hist(an_mp, bins=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+#         range=(0, 10), facecolor='green', align='left', rwidth=0.5)
+# ax.set_title('Histogram of Observed Analogue MP Scheme Selection for ' +
+#              param['method']+' Method')
+#
+# ax2.hist(an_pbl, bins=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+#          range=(0, 10), facecolor='orange', align='left', rwidth=0.3)
+# ax2.set_title('Histogram of Observed Analogue PBL Scheme Selection'+param['method']+' Method')
+# # plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
+# #             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
+# #             '_mem_selection.png')
+# plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_mem_selection.png')
+#
+# xlab = 'Ranking'
+# ylab = 'Observed Frequency'
+# ticks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+# ax, ax2 = plot_panels((16, 16), (2, 2), 2,
+#                       grid=True,
+#                       x_labels=[xlab],
+#                       y_labels=[ylab],
+#                       ylim=(0, 20))
+# ax.hist(np.array(mp_ranks) + 1, bins=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+#         range=(0, 10), facecolor='green', align='left', rwidth=0.4)
+# ax.set_title('Histogram of Observed Analogue MP Member Ranking '+param['method']+' Method')
+# ax.set_xticks(ticks)
+# ax2.hist(np.array(pbl_ranks) + 1, bins=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+#          range=(0, 10), facecolor='orange', align='left', rwidth=0.5)
+# ax2.set_title('Histogram of Observed Analogue PBL Member Ranking'+param['method']+' Method')
+# ax2.set_xticks(ticks)
+# # plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
+# #             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
+# #             '_ranks.png')
+# plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_ranks.png')
 
 # Find average best member
 tot_rmse = verify_members(pcp, stage4.total_precipitation, verif_param, mem_list)
@@ -536,52 +599,52 @@ np.save(param['directory']+param['method']+'_rmse_an_pbl.npy', rmse_an_pbl)
 np.save(param['directory']+param['method']+'_rmse_best_mp.npy', rmse_best_mp)
 np.save(param['directory']+param['method']+'_rmse_best_pbl.npy', rmse_best_pbl)
 
-print('Making Plots', flush=True)
-fdates = [case[-2] for case in an_best_pbl]
-
-fig = plt.figure(figsize=(20, 10))
-ax = fig.add_subplot(1, 1, 1)
-plt.plot(fdates, diff_rmse_mp,
-         label='Analogue - Best ('+mean_best_mp+')',
-         color='tab:green',
-         linewidth=0.7)
-# plt.plot(fdates, np.array(rmse_best_mp),
-#          label='Best MP - '+mean_best_mp,
+# print('Making Plots', flush=True)
+# fdates = [case[-2] for case in an_best_pbl]
+#
+# fig = plt.figure(figsize=(20, 10))
+# ax = fig.add_subplot(1, 1, 1)
+# plt.plot(fdates, diff_rmse_mp,
+#          label='Analogue - Best ('+mean_best_mp+')',
 #          color='tab:green',
 #          linewidth=0.7)
-plt.title('Analogue and Average Best Hybrid RMSE for MP Members Difference'
-          '(Analogue - Best) '+param['method']+' Method')
-ax.xaxis.set_major_locator(mdates.MonthLocator())
-ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d-%y'))
-ax.xaxis.set_minor_locator(mdates.DayLocator())
-ax.axhline(linewidth=4, color='tab:red')
-plt.legend(shadow=True, fontsize='large', loc=0)
-plt.grid()
-# plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
-#             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
-#             '_an_vs_best_mp.png')
-plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_an_vs_best_mp.png')
-
-fig = plt.figure(figsize=(20, 10))
-ax = fig.add_subplot(1, 1, 1)
-plt.plot(fdates, diff_rmse_pbl,
-         label='Analogue - Best ('+mean_best_pbl+')',
-         color='tab:green',
-         linewidth=0.7)
-# plt.plot(fdates, np.array(rmse_best_pbl),
-#          label='Best PBL - '+mean_best_pbl,
+# # plt.plot(fdates, np.array(rmse_best_mp),
+# #          label='Best MP - '+mean_best_mp,
+# #          color='tab:green',
+# #          linewidth=0.7)
+# plt.title('Analogue and Average Best Hybrid RMSE for MP Members Difference'
+#           '(Analogue - Best) '+param['method']+' Method')
+# ax.xaxis.set_major_locator(mdates.MonthLocator())
+# ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d-%y'))
+# ax.xaxis.set_minor_locator(mdates.DayLocator())
+# ax.axhline(linewidth=4, color='tab:red')
+# plt.legend(shadow=True, fontsize='large', loc=0)
+# plt.grid()
+# # plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
+# #             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
+# #             '_an_vs_best_mp.png')
+# plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_an_vs_best_mp.png')
+#
+# fig = plt.figure(figsize=(20, 10))
+# ax = fig.add_subplot(1, 1, 1)
+# plt.plot(fdates, diff_rmse_pbl,
+#          label='Analogue - Best ('+mean_best_pbl+')',
 #          color='tab:green',
 #          linewidth=0.7)
-plt.title('Analogue and Average Best Hybrid RMSE for PBL Members Difference '
-          '(Analogue - Best) '+param['method']+' Method')
-ax.xaxis.set_major_locator(mdates.MonthLocator())
-ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d-%y'))
-ax.xaxis.set_minor_locator(mdates.DayLocator())
-ax.axhline(linewidth=4, color='tab:red')
-plt.legend(shadow=True, fontsize='large', loc=0)
-plt.grid()
-# plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
-#             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
-#             '_an_vs_best_pbl.png')
-plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_an_vs_best_pbl.png')
-print('Analogue Analysis Completed', flush=True)
+# # plt.plot(fdates, np.array(rmse_best_pbl),
+# #          label='Best PBL - '+mean_best_pbl,
+# #          color='tab:green',
+# #          linewidth=0.7)
+# plt.title('Analogue and Average Best Hybrid RMSE for PBL Members Difference '
+#           '(Analogue - Best) '+param['method']+' Method')
+# ax.xaxis.set_major_locator(mdates.MonthLocator())
+# ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d-%y'))
+# ax.xaxis.set_minor_locator(mdates.DayLocator())
+# ax.axhline(linewidth=4, color='tab:red')
+# plt.legend(shadow=True, fontsize='large', loc=0)
+# plt.grid()
+# # plt.savefig(param['directory']+param['method']+'_'+str(param['threshold'])+'_std' +
+# #             str(param['sigma'])+'_'+str(param['forecast_hour'])+'_d0'+str(param['domain']) +
+# #             '_an_vs_best_pbl.png')
+# plt.savefig(param['directory']+param['method']+'_d0'+str(int(dom))+'_an_vs_best_pbl.png')
+# print('Analogue Analysis Completed', flush=True)

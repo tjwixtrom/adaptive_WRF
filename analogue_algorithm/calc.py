@@ -119,7 +119,12 @@ def find_analogue(forecast, dataset, mean=False):
         an_idx = np.nanargmin(score)
     except ValueError:
         an_idx = np.nan
-    return an_idx
+    # Return the analogue score too
+    try:
+        an_score = score[an_idx]
+    except ValueError:
+        an_score = np.nan
+    return an_idx, an_score
 
 
 def verify_members(dataset, observations, parameters, mem_list):
@@ -247,7 +252,12 @@ def find_analogue_precip_area(forecast, dataset):
         an_idx = np.nanargmin(score)
     except ValueError:
         an_idx = np.nan
-    return an_idx
+    # Return the analogue score too
+    try:
+        an_score = score[an_idx]
+    except ValueError:
+        an_score = np.nan
+    return an_idx #, an_score
 
 
 def find_max_coverage(data, dim=None):

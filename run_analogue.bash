@@ -4,7 +4,7 @@
 #$ -S /bin/bash
 #$ -N analogue
 #$ -q ancellcc
-#$ -pe sm 1
+#$ -pe sm 8
 #$ -P communitycluster
 #$ -t 1-13:1
 
@@ -30,9 +30,9 @@ ID=$(( $SGE_TASK_ID - 1 ))
 #stdev=${stdevs[${stdevs_idx}]}
 # mslp_thresholds=( 995 1000 1005 1010 1015 1020 1025 )
 mslp_threshold=1005
-dewpt_threshold=20
-cape_threshold=1000
-pcp_threshold=10
+dewpt_threshold=5
+cape_threshold=500
+pcp_threshold=1
 height_threshold=5700
 an_fhour=$1
 methods=(
@@ -54,7 +54,7 @@ methods=(
 method=${methods[${ID}]}
 sigma=1
 
-save_dir=/lustre/work/twixtrom/analogue_analysis_optimal/f${an_fhour}/${method}/
+save_dir=/lustre/work/twixtrom/analogue_analysis_optimal_new/f${an_fhour}/${method}/
 mkdir -p ${save_dir}
 python_exec=/home/twixtrom/miniconda3/envs/analogue/bin/python
 runscript=/home/twixtrom/adaptive_WRF/calc_analogue.py
